@@ -14,10 +14,10 @@
 
 window.GWORLD_CONFIG = {
   // ⚠️ デプロイ後に実際のURLに置き換えてください
-  GAS_WEB_APP_URL: "https://script.google.com/macros/s/AKfycbyo7jv8z9ny8ic8KvQlxFiG90ApfWmz3vQrJkLZHFTM3YYHJIJ9paxfVWvy4Jh81RxmaQ/exec",
+  GAS_WEB_APP_URL: "https://script.google.com/macros/s/REPLACE_WITH_YOUR_DEPLOY_ID/exec",
 
   // バージョン情報
-  APP_VERSION: "v85.0.0",
+  APP_VERSION: "v85.1.0",
   BUILD: "v72.2.1 UI × v80 通信 × GitHub Pages",
 
   // 端末側でURLを上書き可能（設定画面から）

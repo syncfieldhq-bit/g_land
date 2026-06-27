@@ -2573,19 +2573,59 @@ window.escapeHtml = function(s){
    * ============================================================ */
   function api(name){
     const args = Array.prototype.slice.call(arguments, 1);
-    const payload = args.length === 0 ? {}
-                  : (args.length === 1 && typeof args[0] === 'object' && args[0] !== null) ? args[0]
-                  : { _args: args, _legacy: true,
-                      roundId:   args[0],
-                      patch:     args[1],
-                      userId:    args[1],
-                      playerName:args[1],
-                      playerType:args[2],
-                      holeNo:    args[3],
-                      par:       args[4],
-                      stroke:    args[5],
-                      putt:      args[6],
-                      items:     args[1] };
+    /* v85.1.0 FIX: API ごとに正しい引数マッピング
+       - apiUpdateUser   : (userId, patch)            -> { userId, patch, ...patch }
+       - apiGetUser      : (userId)                   -> { userId }
+       - apiBootstrap    : (payloadObj)               -> そのまま
+       - apiListScores   : (roundId)                  -> { roundId }
+       - apiListRoundMembers : (roundId)              -> { roundId }
+       - apiListGroupBoard   : (roundId)              -> { roundId }
+       - apiHostCheckSummary : (roundId)              -> { roundId }
+       - apiCheckRoundPulse  : ({roundId})            -> そのまま
+       - apiPatchRound   : (roundId, patch)           -> { roundId, patch, ...patch }
+       - apiSavePlayerScore        : (payloadObj)     -> そのまま
+       - apiBatchSavePlayerScores  : (payloadObj)     -> そのまま
+       - apiRegisterUser : (payloadObj)               -> そのまま
+       - apiGetVersion   : ({})                       -> そのまま
+    */
+    let payload;
+    if (args.length === 0) {
+      payload = {};
+    } else if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null) {
+      payload = args[0];
+    } else if (name === 'apiUpdateUser') {
+      /* (userId, patch) */
+      const userId = args[0];
+      const patch  = (args[1] && typeof args[1] === 'object') ? args[1] : {};
+      payload = Object.assign({}, patch, { userId: userId, patch: patch });
+    } else if (name === 'apiGetUser') {
+      payload = { userId: args[0] };
+    } else if (
+      name === 'apiListScores' ||
+      name === 'apiListRoundMembers' ||
+      name === 'apiListGroupBoard' ||
+      name === 'apiHostCheckSummary' ||
+      name === 'apiLeaveRound' ||
+      name === 'apiFinishRound' ||
+      name === 'apiActivateRound'
+    ) {
+      payload = { roundId: args[0] };
+    } else if (name === 'apiPatchRound') {
+      /* (roundId, patch) */
+      const roundId = args[0];
+      const patch   = (args[1] && typeof args[1] === 'object') ? args[1] : {};
+      payload = Object.assign({}, patch, { roundId: roundId, patch: patch });
+    } else if (name === 'apiSaveScore' || name === 'apiBatchSaveScores') {
+      /* legacy 互換 */
+      payload = { roundId: args[0], items: args[1] };
+    } else {
+      /* fallback : 単一文字列なら value として */
+      payload = { value: args[0] };
+    }
+
+    /* デバッグ用 (本番では削除可) */
+    try { console.debug('[gwApi]', name, payload); } catch(_){}
+
     const url = (window.GWORLD_CONFIG && window.GWORLD_CONFIG.GAS_WEB_APP_URL) || '';
     if (!url || /REPLACE_WITH/.test(url)) {
       console.warn('[GW STUB]', name, args, 'WEB_APP_URL not configured');
@@ -5557,5 +5597,6 @@ _bindSafe('orientation',     bindOrientation);
 
 </script>
 
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

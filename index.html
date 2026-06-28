@@ -2573,7 +2573,7 @@ window.escapeHtml = function(s){
    * ============================================================ */
   function api(name){
     const args = Array.prototype.slice.call(arguments, 1);
-    /* v85.1.0 FIX: API ごとに正しい引数マッピング
+    /* v85.2.0 FIX: API ごとに正しい引数マッピング
        - apiUpdateUser   : (userId, patch)            -> { userId, patch, ...patch }
        - apiGetUser      : (userId)                   -> { userId }
        - apiBootstrap    : (payloadObj)               -> そのまま
@@ -4178,6 +4178,48 @@ _bindSafe('orientation',     bindOrientation);
    *   - try/catch で内部例外を全部画面に出す
    * ============================================================ */
   function bindRegister(){
+    /* v85.2.0 FIX-4 : 入力中の下書きを sessionStorage に保存・復元
+       (画面の予期せぬ再描画で入力した値が消えるのを防ぐ) */
+    var DRAFT_KEY = 'gworld_register_draft_v85_2';
+    var DRAFT_IDS = ['regFamily','regFirst','regKana','regKanaFirst','regNick'];
+
+    function restoreDraft_(){
+      try {
+        var saved = sessionStorage.getItem(DRAFT_KEY);
+        if (!saved) return;
+        var data = JSON.parse(saved) || {};
+        DRAFT_IDS.forEach(function(id){
+          var el = document.getElementById(id);
+          if (el && !el.value && data[id]) el.value = data[id];
+        });
+      } catch(_){}
+    }
+    function saveDraft_(){
+      try {
+        var data = {};
+        DRAFT_IDS.forEach(function(id){
+          var el = document.getElementById(id);
+          if (el) data[id] = el.value || '';
+        });
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+      } catch(_){}
+    }
+    function clearDraft_(){
+      try { sessionStorage.removeItem(DRAFT_KEY); } catch(_){}
+    }
+    /* 復元 → 各入力欄の input イベントで保存 */
+    restoreDraft_();
+    DRAFT_IDS.forEach(function(id){
+      var el = document.getElementById(id);
+      if (el && !el.__gwDraftBound) {
+        el.__gwDraftBound = true;
+        el.addEventListener('input', saveDraft_);
+        el.addEventListener('blur',  saveDraft_);
+      }
+    });
+    /* 登録成功時に下書きを消す */
+    window.__gwClearRegisterDraft = clearDraft_;
+
     var btn = document.getElementById('regSubmit');
     if (!btn) {
       console.warn('[bindRegister] #regSubmit not found in DOM');
@@ -4229,6 +4271,8 @@ _bindSafe('orientation',     bindOrientation);
             firstName:first, firstKana:kanaFirst,
             courseAdjust:0
           });
+          /* v85.2.0 FIX-4 : 登録送信成功時に下書きクリア */
+          try { if (window.__gwClearRegisterDraft) window.__gwClearRegisterDraft(); } catch(_){}
         } catch(e){
           console.warn('[bindRegister] Store.setSelf failed', e);
           alert('内部エラー(Store): ' + (e && e.message || e));
@@ -4409,7 +4453,16 @@ _bindSafe('orientation',     bindOrientation);
     } catch(_){ }
     var showIn = (holeCount === 18);
 
+    /* v85.2.0 FIX-2 : 自分を常に最上段に出す (他は seatOrder 順) */
+    var _myUserId = '';
+    try {
+      var _ss = (typeof Store !== 'undefined' && Store.get) ? Store.get() : {};
+      _myUserId = String(_ss.userId || '');
+    } catch(_){}
     var players = (data.players || []).slice().sort(function(a, b){
+      var aMe = (String(a.userId || '') === _myUserId) ? 0 : 1;
+      var bMe = (String(b.userId || '') === _myUserId) ? 0 : 1;
+      if (aMe !== bMe) return aMe - bMe;
       return (a.seatOrder || 0) - (b.seatOrder || 0);
     });
     var scoreMap = {};
@@ -4762,7 +4815,22 @@ _bindSafe('orientation',     bindOrientation);
           toast('同伴者のスコアは本人の端末から入力してください', true);
           return;
         }
-        openPanelByHoleNo(startBtn.getAttribute('data-player'), 1, false);
+        /* v85.2.0 FIX-3 : 常に1Hではなく、未入力の最初のホールから開く */
+        var _pname = startBtn.getAttribute('data-player');
+        var _nextHole = 1;
+        try {
+          var _state = Store.get();
+          var _holeCount = (typeof Store.calc !== 'undefined' && Store.calc.holeCount) ? Store.calc.holeCount() : 18;
+          var _slist = ((_state.scores || {})[_pname] || {}).stroke || [];
+          for (var _h = 0; _h < _holeCount; _h++) {
+            if (_slist[_h] == null) { _nextHole = _h + 1; break; }
+            if (_h === _holeCount - 1) _nextHole = _holeCount; /* 全部埋まっていれば最終H */
+          }
+          if (_state.currentHole && _slist[_state.currentHole - 1] == null) {
+            _nextHole = _state.currentHole; /* 中断ホールが未入力なら優先 */
+          }
+        } catch(_){}
+        openPanelByHoleNo(_pname, _nextHole, false);
         return;
       }
       const td = e.target.closest('td.editable');
@@ -5464,38 +5532,29 @@ _bindSafe('orientation',     bindOrientation);
     return !s.joinMode;
   }
   function openInviteQR(){
-  const s = Store.get();
-
-  if (!s.roundId || !s.groupId) {
-    toast('先に「ラウンド開始」を押してください', true);
-    setScreen('prep');
-    return;
+    const s = Store.get();
+    if (!s.roundId || !s.groupId) {
+      toast('先に「ラウンド開始」を押してください', true);
+      setScreen('prep');
+      return;
+    }
+    if (!isHostForInvite_()) {
+      toast('招待QRはホスト端末でのみ発行できます', true);
+      return;
+    }
+    /* v85.2.0 FIX-1 : 招待URLは必ず GitHub Pages を指す。
+       (GAS の /exec を指してしまうと、合流側で「indexが無い」エラーになる) */
+    const base = location.origin + location.pathname;
+    const url = base + '?join=' + encodeURIComponent(s.groupId) + '&t=' + Date.now();
+    GWQR.render($('#inviteQR'), url, 220);
+    GWDom.setText($('#inviteUrl'), url);
+    /* v71.2.3 : URL コピーボタン bind (毎回上書きでOK) */
+    const copyBtn = document.getElementById('btnCopyInviteUrl');
+    if (copyBtn) {
+      copyBtn.onclick = function(){ copyInviteURL_(url); };
+    }
+    openModal('gmInvite');
   }
-
-  if (!isHostForInvite_()) {
-    toast('招待QRはホスト端末でのみ発行できます', true);
-    return;
-  }
-
-  // v85.1.1 FIX:
-  // 招待URLのベースは必ず「今開いているGitHub PagesのURL」を使う
-  // GASの /exec URL は絶対に使わない
-  const base = location.origin + location.pathname;
-  const url  = base + '?join=' + encodeURIComponent(s.groupId) + '&t=' + Date.now();
-
-  GWQR.render($('#inviteQR'), url, 220);
-  GWDom.setText($('#inviteUrl'), url);
-
-  const copyBtn = document.getElementById('btnCopyInviteUrl');
-  if (copyBtn) {
-    copyBtn.onclick = function(){
-      copyInviteURL_(url);
-    };
-  }
-
-  openModal('gmInvite');
-}
-
 
   /* v71.2.3 : 招待URLをクリップボードへ。
    *  Clipboard API が使えない環境用に textarea + execCommand フォールバック付き。 */

@@ -146,14 +146,7 @@ a{ color:var(--c-green-dark); text-decoration:none; }
 body.scr-register .screen#screen-register{ display:block; padding:0; }
 body.scr-home     .screen#screen-home    { display:block; }
 body.scr-prep     .screen#screen-prep    { display:block; }
-body.scr-card     .screen#screen-card    { display:flex; flex-direction:column; padding-bottom:0; padding-top:calc(env(safe-area-inset-top) + 96px); /* v85.3.4-hotfix: プロ画面のツールバーをヘッダ下に押し下げる */ }
-
-/* v85.3.4-hotfix : PRO 起動中は画面最上端から直接 toolbar を始めないよう、
-   上に必ず safe-area + 96px ぶんの領域を確保する */
-body.scr-input-pro #screen-card,
-body.scr-input-pro{
-  padding-top:calc(env(safe-area-inset-top) + 96px) !important;
-}
+body.scr-card     .screen#screen-card    { display:flex; flex-direction:column; padding-bottom:0; padding-top:calc(env(safe-area-inset-top) + 8px);}
 body.scr-compete  .screen#screen-compete { display:block; }
 body.scr-mypage   .screen#screen-mypage  { display:block; }
 body.scr-register .bottom-nav{ display:none; }
@@ -1086,6 +1079,8 @@ body.scr-register .bottom-nav{ display:none; }
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   will-change: scroll-position;
+  padding-top: 0;
+  margin-top:  0;
 }
 
 /* 入力パネル : 開閉アニメ用のレイヤ予告

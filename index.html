@@ -1261,6 +1261,24 @@ body.scr-register .bottom-nav{ display:none; }
 .mode-pane.is-active{ display:block; }
 
 /* ============================================================
+ * v85.3.1 PWA-FIX : ステータスバーぶんの上余白を全画面で確保
+ * ============================================================ */
+:root { --gw-safe-top: env(safe-area-inset-top, 0px); }
+#screen-card .card-dash{
+  padding-top: max(8px, env(safe-area-inset-top));
+}
+#screen-card .card-modeswitch{
+  padding-top: 4px;
+}
+
+/* v85.3.1 : Safari 連打ズーム抑制 (アクセシビリティ温存) */
+button, .dash-cell, .card-side-close, .card-side-qr,
+.ipro-stepper-btn, .ipro-commit-btn, .cms-btn, .ipro-tb-btn, .ipro-skip-btn {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+}
+
+/* ============================================================
  * v85.3.0 : 入力モード PRO (1ページ完結型)
  * A案 : スリム常時表示ツールバー + 上=チーム表示 + 中=広告 + 下=自分入力
  * ============================================================ */
@@ -1282,13 +1300,14 @@ body.scr-register .bottom-nav{ display:none; }
 /* ----- スリムツールバー (高さ40px固定 / 横スクロール可) ----- */
 .ipro-toolbar{
   flex: 0 0 auto;
-  height: 40px;
+  min-height: 40px;
   background: #ffffff;
   border-bottom: 1px solid #e3e6ea;
   display:flex;
   align-items:center;
   gap: 4px;
   padding: 0 6px;
+  padding-top: max(0px, env(safe-area-inset-top));
   overflow-x:auto;
   overflow-y:hidden;
   scrollbar-width: none;
@@ -2580,7 +2599,7 @@ body.scr-register .bottom-nav{ display:none; }
      *   ⑤ クライアント保存バージョンとの差分を判定 (state.html へバトンタッチ)
      * ============================================================ */
     window.GW_BOOT = {
-      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.0",
+      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.1",
       versionCode   : 85000,
       buildAt       : new Date().toISOString(),
       course        : "Rokko Kokusai Public",
@@ -2588,7 +2607,7 @@ body.scr-register .bottom-nav{ display:none; }
       urlVersion    : "",
       webAppUrl     : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.GAS_WEB_APP_URL) || "",
       cacheBuster   : "v85",
-      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.0"
+      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.1"
     };
     (function(){
       try {
@@ -4968,15 +4987,29 @@ _bindSafe('orientation',     bindOrientation);
   }
 
   /* ============================================================
-   * v85.3.0 : 入力モード PRO (1ページ完結型) ロジック
-   * - 同伴者スコア表(上) + 広告(中) + 自分入力ステッパ(下)
-   * - 既存の dbUpdateScore / Store / Round を流用
+   * v85.3.1 : 入力モード PRO (1ページ完結型) ロジック - 全面改修版
+   * - 「自分 佐藤」表示 / 組表示に自分を含む / パー基準初期値
+   * - モーダル経由しない直接保存 / 確定後の即時再描画
    * ============================================================ */
+  // 一律パー設定 (将来コース別データに置換可能)
+  var IPRO_DEFAULT_PAR  = 4;
+  var IPRO_DEFAULT_PUTT = 2;
+  function iproGetPar(holeNo, rnd){
+    try {
+      if (rnd && rnd.pars && rnd.pars[holeNo] != null) return Number(rnd.pars[holeNo]);
+      if (rnd && rnd.par  && rnd.par[holeNo]  != null) return Number(rnd.par[holeNo]);
+      if (window.HOLE_PAR_MAP && window.HOLE_PAR_MAP[holeNo] != null)
+        return Number(window.HOLE_PAR_MAP[holeNo]);
+    } catch(_){}
+    return IPRO_DEFAULT_PAR;
+  }
   var IPRO_STATE = {
     holeNo: 1,
-    score:  null,
+    score:  null,    // null = まだ ＋− を一度も押してない (画面では par を表示)
     putt:   null,
-    dirty:  false
+    dirty:  false,
+    par:    IPRO_DEFAULT_PAR,
+    parPutt: IPRO_DEFAULT_PUTT
   };
 
   function renderInputPro(){
@@ -4984,11 +5017,11 @@ _bindSafe('orientation',     bindOrientation);
       var s = (window.Store && Store.get && Store.get()) || {};
       var rnd = s.round || {};
       var self = s.self || s.user || {};
-      var selfName = (self.nickname || self.familyName || '自分');
+      // v85.3.1 : 「自分 佐藤」用の表示名 (familyName 優先, fallback: nickname)
+      var displayName = self.familyName || self.lastName || self.nickname || '';
       var holes = rnd.holes || 18;
 
       // ツールバー値を既存のdashから同期
-      var $ = function(sel){ return document.querySelector(sel); };
       function copyText(srcId, dstId){
         var a = document.getElementById(srcId);
         var b = document.getElementById(dstId);
@@ -5003,12 +5036,12 @@ _bindSafe('orientation',     bindOrientation);
       var iproAt = document.getElementById('iproTeamSyncAt');
       if (bmAt && iproAt) iproAt.textContent = '最終更新 ' + (bmAt.textContent || '―');
 
-      // 自分の名前
+      // v85.3.1 : 「自分 佐藤」表示 (空なら「自分」だけ)
       var selfNameEl = document.getElementById('iproSelfName');
-      if (selfNameEl) selfNameEl.textContent = '自分 ' + selfName;
+      if (selfNameEl) selfNameEl.textContent = displayName ? ('自分 ' + displayName) : '自分';
 
-      // 「次の未入力ホール」を推定 (既存 utility があれば流用)
-      var myScores = (rnd.scores && (rnd.scores[self.userId] || rnd.scores[selfName])) || {};
+      // 「次の未入力ホール」を推定
+      var myScores = iproGetPlayerScores(self, rnd);
       var nextHole = 1;
       for (var i = 1; i <= holes; i++) {
         var v = myScores[i] || (myScores['h' + i]);
@@ -5017,6 +5050,10 @@ _bindSafe('orientation',     bindOrientation);
         if (i === holes) nextHole = holes;
       }
       IPRO_STATE.holeNo = nextHole;
+      // パー設定
+      IPRO_STATE.par     = iproGetPar(nextHole, rnd);
+      IPRO_STATE.parPutt = IPRO_DEFAULT_PUTT;
+      // 既入力があれば取得、未入力なら null (画面はパー表示)
       var cur = myScores[nextHole] || myScores['h' + nextHole] || {};
       IPRO_STATE.score = (cur.score != null) ? Number(cur.score) : null;
       IPRO_STATE.putt  = (cur.putt  != null) ? Number(cur.putt)  : null;
@@ -5025,22 +5062,50 @@ _bindSafe('orientation',     bindOrientation);
       var holeEl  = document.getElementById('iproSelfHole');
       var scoreEl = document.getElementById('iproScoreVal');
       var puttEl  = document.getElementById('iproPuttVal');
-      if (holeEl)  holeEl.textContent  = nextHole + 'H';
-      if (scoreEl) scoreEl.textContent = (IPRO_STATE.score == null) ? '―' : IPRO_STATE.score;
-      if (puttEl)  puttEl.textContent  = (IPRO_STATE.putt  == null) ? '―' : IPRO_STATE.putt;
+      if (holeEl)  holeEl.textContent  = nextHole + 'H (Par ' + IPRO_STATE.par + ')';
+      // v85.3.1 : 未入力なら par/2 を表示 (差分入力モード)
+      if (scoreEl) scoreEl.textContent = (IPRO_STATE.score != null) ? IPRO_STATE.score : IPRO_STATE.par;
+      if (puttEl)  puttEl.textContent  = (IPRO_STATE.putt  != null) ? IPRO_STATE.putt  : IPRO_STATE.parPutt;
 
-      // 同伴者スコア表(コンパクト)
-      renderIproTeam(rnd, self, holes);
+      // 同伴者スコア表(自分を必ず含める)
+      renderIproTeam(rnd, self, holes, displayName);
     } catch(e) {
       console.error('[renderInputPro] failed', e);
     }
   }
 
-  function renderIproTeam(rnd, self, holes){
+  // v85.3.1 : プレイヤースコア辞書をキー名揺れに対応して取得
+  function iproGetPlayerScores(p, rnd){
+    if (!p || !rnd || !rnd.scores) return {};
+    var cands = [p.userId, p.uid, p.id, p.nickname, p.familyName, p.lastName];
+    for (var i = 0; i < cands.length; i++) {
+      var k = cands[i];
+      if (k && rnd.scores[k]) return rnd.scores[k];
+    }
+    return {};
+  }
+
+  function renderIproTeam(rnd, self, holes, displayNameOpt){
     var table = document.getElementById('iproTeamTable');
     if (!table) return;
-    var members = (rnd.members || []).slice();
-    if (!members.length && self) members = [self];
+    var members = (rnd && rnd.members) ? rnd.members.slice() : [];
+    // v85.3.1 : 自分が members に含まれてなければ先頭に追加 (招待してない場合の対策)
+    var selfUid = self && (self.userId || self.uid || self.id);
+    var hasSelf = false;
+    for (var mi = 0; mi < members.length; mi++) {
+      var mm = members[mi];
+      if (mm && (mm.userId === selfUid || mm.uid === selfUid || mm.id === selfUid)) { hasSelf = true; break; }
+    }
+    if (!hasSelf && self) {
+      members.unshift({
+        userId:     selfUid,
+        nickname:   self.nickname,
+        familyName: self.familyName || self.lastName,
+        firstName:  self.firstName,
+        _isSelf:    true
+      });
+    }
+    if (!members.length) members = [{ familyName:'自分', _isSelf:true }];
 
     var firstHalf = Math.min(9, holes);
     var head = '<tr><th class="tm-name">名前</th>';
@@ -5050,11 +5115,12 @@ _bindSafe('orientation',     bindOrientation);
 
     var body = '';
     members.forEach(function(m){
-      var name = m.nickname || m.familyName || '―';
-      var isSelf = (self && (m.userId === self.userId || name === (self.nickname || self.familyName)));
+      // v85.3.1 : 名前は familyName 優先 (「佐藤」「坪井」のように表示)
+      var name = m.familyName || m.lastName || m.nickname || '―';
+      var isSelf = !!m._isSelf || (self && ((m.userId && m.userId === selfUid) || (m.uid && m.uid === selfUid)));
       var rowCls = isSelf ? ' class="is-self"' : '';
       body += '<tr' + rowCls + '><td class="tm-name">' + (name.length > 6 ? name.slice(0,6) : name) + '</td>';
-      var scores = (rnd.scores && (rnd.scores[m.userId] || rnd.scores[name])) || {};
+      var scores = iproGetPlayerScores(m, rnd);
       var sum = 0, out = 0, hasAny = false;
       for (var h = 1; h <= firstHalf; h++) {
         var v = scores[h] || scores['h' + h] || {};
@@ -5063,7 +5129,6 @@ _bindSafe('orientation',     bindOrientation);
         body += '<td>' + (s != null && !isNaN(s) ? s : '') + '</td>';
       }
       if (holes > 9) body += '<td class="tm-total">' + (hasAny ? out : '') + '</td>';
-      // 後半も足す
       for (var h2 = 10; h2 <= holes; h2++) {
         var v2 = scores[h2] || scores['h' + h2] || {};
         var s2 = (v2.score != null) ? Number(v2.score) : null;
@@ -5077,17 +5142,21 @@ _bindSafe('orientation',     bindOrientation);
     if (tbody) tbody.innerHTML = body;
   }
 
-  /* ステッパ / 確定ボタン バインド */
+  /* v85.3.1 : ステッパ / 確定ボタン バインド - モーダル呼ばない直接保存版 */
   function bindInputProSteppers(){
     function step(key, delta){
-      var v = IPRO_STATE[key];
-      v = (v == null ? 0 : Number(v)) + delta;
-      if (key === 'score') v = Math.max(1, Math.min(15, v));
-      if (key === 'putt')  v = Math.max(0, Math.min(10, v));
-      IPRO_STATE[key] = v;
+      // v85.3.1 : 未入力(null) のときは par/parPutt を起点に増減
+      var cur = IPRO_STATE[key];
+      if (cur == null) {
+        cur = (key === 'score') ? IPRO_STATE.par : IPRO_STATE.parPutt;
+      }
+      cur = Number(cur) + delta;
+      if (key === 'score') cur = Math.max(1, Math.min(15, cur));
+      if (key === 'putt')  cur = Math.max(0, Math.min(10, cur));
+      IPRO_STATE[key] = cur;
       IPRO_STATE.dirty = true;
       var el = document.getElementById(key === 'score' ? 'iproScoreVal' : 'iproPuttVal');
-      if (el) el.textContent = v;
+      if (el) el.textContent = cur;
     }
     _safeBind('#iproScoreDown','click', function(){ step('score', -1); });
     _safeBind('#iproScoreUp',  'click', function(){ step('score',  1); });
@@ -5099,34 +5168,63 @@ _bindSafe('orientation',     bindOrientation);
     });
     _safeBind('#iproCommitBtn','click', function(){
       try {
-        if (IPRO_STATE.score == null) {
-          if (typeof toast === 'function') toast('スコアを入力してください', true);
+        // v85.3.1 : 未操作なら par 値で確定 (差分入力モードのデフォルト)
+        var finalScore = (IPRO_STATE.score != null) ? IPRO_STATE.score : IPRO_STATE.par;
+        var finalPutt  = (IPRO_STATE.putt  != null) ? IPRO_STATE.putt  : IPRO_STATE.parPutt;
+        var holeNo     = IPRO_STATE.holeNo;
+
+        var s    = (window.Store && Store.get && Store.get()) || {};
+        var self = s.self || s.user || {};
+        var uid  = self.userId || self.uid || self.id ||
+                   self.nickname || self.familyName || 'self';
+
+        // v85.3.1 : モーダル経由しない直接保存
+        // (A) apiSaveScore があれば使う (推奨)
+        var saved = false;
+        try {
+          if (typeof apiSaveScore === 'function') {
+            apiSaveScore(uid, holeNo, finalScore, finalPutt);
+            saved = true;
+          } else if (typeof dbUpdateScore === 'function') {
+            dbUpdateScore(uid, holeNo, { score: finalScore, putt: finalPutt });
+            saved = true;
+          } else if (typeof gwApi === 'function') {
+            // 互換: gwApi('apiSaveScore', uid, holeNo, score, putt)
+            gwApi('apiSaveScore', uid, holeNo, finalScore, finalPutt);
+            saved = true;
+          }
+        } catch(e){ console.warn('[ipro save api]', e); }
+
+        // (B) Store にも直接反映 (即時表示用)
+        try {
+          s.round = s.round || {};
+          s.round.scores = s.round.scores || {};
+          s.round.scores[uid] = s.round.scores[uid] || {};
+          s.round.scores[uid][holeNo] = { score: finalScore, putt: finalPutt };
+          if (Store.setState)      Store.setState(s);
+          else if (Store.set)      Store.set(s);
+          else if (Store.save)     Store.save();
+          saved = true;
+        } catch(e){ console.warn('[ipro store]', e); }
+
+        if (!saved) {
+          if (typeof toast === 'function') toast('保存に失敗しました', true);
           return;
         }
-        // 既存の openPanelByHoleNo / dbUpdateScore があれば連動
-        var s = (window.Store && Store.get && Store.get()) || {};
-        var self = s.self || s.user || {};
-        var name = (self.nickname || self.familyName || '');
-        // 1) 既存パネル経由で保存(信頼性高い)
-        if (typeof openPanelByHoleNo === 'function') {
-          openPanelByHoleNo(name, IPRO_STATE.holeNo, false);
-          // パネル内のスコア/パットを反映する hook
-          try {
-            var sIn = document.querySelector('#scorePanel input[name="score"], #panelScore');
-            var pIn = document.querySelector('#scorePanel input[name="putt"],  #panelPutt');
-            if (sIn) { sIn.value = IPRO_STATE.score; sIn.dispatchEvent(new Event('input',{bubbles:true})); }
-            if (pIn) { pIn.value = (IPRO_STATE.putt == null ? '' : IPRO_STATE.putt); pIn.dispatchEvent(new Event('input',{bubbles:true})); }
-            var ok = document.querySelector('#scorePanel .panel-ok, #panelOk, #btnPanelConfirm');
-            if (ok) ok.click();
-          } catch(_){ }
-        }
-        if (typeof toast === 'function') toast(IPRO_STATE.holeNo + 'H 確定: ' + IPRO_STATE.score);
-        // 次のホールへ
+
+        if (typeof toast === 'function') toast(holeNo + 'H 確定: ' + finalScore);
+
+        // 次のホールへ進む
         var holes = (s.round && s.round.holes) || 18;
-        if (IPRO_STATE.holeNo < holes) IPRO_STATE.holeNo++;
+        if (holeNo < holes) IPRO_STATE.holeNo = holeNo + 1;
         IPRO_STATE.score = null;
         IPRO_STATE.putt  = null;
-        setTimeout(function(){ try{ renderInputPro(); }catch(_){} }, 300);
+        IPRO_STATE.dirty = false;
+
+        // v85.3.1 : 即時再描画 (PRO画面 + 既存組表示)
+        try { renderInputPro(); } catch(_){ }
+        try { if (typeof renderBoard === 'function') renderBoard(); } catch(_){ }
+        try { if (typeof renderCard  === 'function') renderCard();  } catch(_){ }
       } catch(e) {
         console.error('[ipro commit]', e);
         if (typeof toast === 'function') toast('確定に失敗しました', true);

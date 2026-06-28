@@ -1079,8 +1079,9 @@ body.scr-register .bottom-nav{ display:none; }
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   will-change: scroll-position;
-  padding-top: 0;
-  margin-top:  0;
+  flex: 1 1 auto;        /* 中味が増えても縮める */
+  min-height: 0;          /* flex 子の高さ詰まり回避 */
+  overflow-y: auto;       /* 溢れたら縦スクロール */
 }
 
 /* 入力パネル : 開閉アニメ用のレイヤ予告

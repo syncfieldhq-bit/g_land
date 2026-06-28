@@ -146,7 +146,14 @@ a{ color:var(--c-green-dark); text-decoration:none; }
 body.scr-register .screen#screen-register{ display:block; padding:0; }
 body.scr-home     .screen#screen-home    { display:block; }
 body.scr-prep     .screen#screen-prep    { display:block; }
-body.scr-card     .screen#screen-card    { display:flex; flex-direction:column; padding-bottom:0; }
+body.scr-card     .screen#screen-card    { display:flex; flex-direction:column; padding-bottom:0; padding-top:calc(env(safe-area-inset-top) + 96px); /* v85.3.4-hotfix: プロ画面のツールバーをヘッダ下に押し下げる */ }
+
+/* v85.3.4-hotfix : PRO 起動中は画面最上端から直接 toolbar を始めないよう、
+   上に必ず safe-area + 96px ぶんの領域を確保する */
+body.scr-input-pro #screen-card,
+body.scr-input-pro{
+  padding-top:calc(env(safe-area-inset-top) + 96px) !important;
+}
 body.scr-compete  .screen#screen-compete { display:block; }
 body.scr-mypage   .screen#screen-mypage  { display:block; }
 body.scr-register .bottom-nav{ display:none; }
@@ -1287,29 +1294,34 @@ button, .dash-cell, .card-side-close, .card-side-qr,
 #paneInputPro{
   display:none;
   flex-direction:column;
-  height: calc(100vh - 220px);
+  /* v85.3.4-hotfix : ナビヘッダぶんの220px + safe-area を最初から織り込み済みにする */
+  height: calc(100vh - env(safe-area-inset-top) - 220px);
   min-height: 560px;
   max-height: 900px;
   padding: 0;
-  margin: 8px 0 0 0;
+  margin: 0;
   background: #f7f8fa;
   border-radius: 12px;
   overflow:hidden;
   border: 1px solid #e3e6ea;
+  position: relative;
+  z-index: 1;
 }
 #paneInputPro.is-active{ display:flex; }
 
 /* ----- スリムツールバー (高さ40px固定 / 横スクロール可) ----- */
 .ipro-toolbar{
   flex: 0 0 auto;
-  min-height: 40px;
+  /* v85.3.4-hotfix : ヘッダからの積み上げ高さを min-height で明確化（BOXサイズ計算が安定する） */
+  min-height: calc(40px + env(safe-area-inset-top));
+  height:     calc(40px + env(safe-area-inset-top));
   background: #ffffff;
   border-bottom: 1px solid #e3e6ea;
   display:flex;
-  align-items:center;
+  align-items:flex-end;               /* v85.3.4-hotfix : セーフエリアぶんを上に確保、ボタンは底に揃える */
   gap: 4px;
-  padding: 0 6px;
-  padding-top: calc(env(safe-area-inset-top) + 42px); /* v85.3.3: 必ず加算で底上げ（maxだけでは効かない問題に対応） */
+  padding: env(safe-area-inset-top) 6px 0 6px;  /* v85.3.4-hotfix : padding-top=env のみ。box-sizing:border-box 前提で高さに含む */
+  box-sizing: border-box;
   overflow-x:auto;
   overflow-y:hidden;
   scrollbar-width: none;
@@ -2606,7 +2618,7 @@ button, .dash-cell, .card-side-close, .card-side-qr,
      *   ⑤ クライアント保存バージョンとの差分を判定 (state.html へバトンタッチ)
      * ============================================================ */
     window.GW_BOOT = {
-      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.3",
+      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.5",
       versionCode   : 85000,
       buildAt       : new Date().toISOString(),
       course        : "Rokko Kokusai Public",
@@ -2614,7 +2626,7 @@ button, .dash-cell, .card-side-close, .card-side-qr,
       urlVersion    : "",
       webAppUrl     : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.GAS_WEB_APP_URL) || "",
       cacheBuster   : "v85",
-      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.3"
+      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.5"
     };
     (function(){
       try {
@@ -4976,9 +4988,19 @@ _bindSafe('orientation',     bindOrientation);
         else                     screenCard.classList.remove('card-pro-fullscreen');
       }
     }
-    _safeBind('#btnSwitchToInput',  'click', function(){ activatePane('input'); });
+    /* v85.3.5 : モード切替時に scoreScreenMode を Store に反映して、
+       renderTableFull を再呼びして「自分のみ / 同伴者含む」を切替える */
+    function __v85_3_5_rerenderCardForMode(mode){
+      try { Store.set({ scoreScreenMode: mode }); } catch(_){ }
+      try { if (typeof renderTableFull === 'function') renderTableFull(Store.get()); } catch(_){ }
+    }
+    _safeBind('#btnSwitchToInput',  'click', function(){
+      activatePane('input');
+      __v85_3_5_rerenderCardForMode('input');
+    });
     _safeBind('#btnSwitchToBoard',  'click', function(){
       activatePane('board');
+      __v85_3_5_rerenderCardForMode('board');
       try { if (typeof renderBoard === 'function') renderBoard(); } catch(_){ }
     });
     _safeBind('#btnOpenHostCheck',  'click', function(){
@@ -5978,7 +6000,20 @@ _bindSafe('orientation',     bindOrientation);
       }).join('') + '<td class="total-score">' + COURSE.par + '</td>' ;
     frag.appendChild(trP);
 
-    s.players.forEach(function(p){
+    /* v85.3.5 : 自分入力モード(paneInput)のときは、同伴者の行を非表示。
+       理由 - モーダルは「自分のスコアを入れる場所」なので、同伴者を見たければ paneBoard へ。
+       他のモード(paneBoard / paneHostCheck)では同伴者行を従来通り表示する。
+       判定 = Store.get().scoreScreenMode === 'input' */
+    var __v85_3_5_isInputMode = false;
+    try { __v85_3_5_isInputMode = (Store && Store.get && Store.get('scoreScreenMode') === 'input'); } catch(_){ }
+    var __v85_3_5_playersToRender = s.players;
+    if (__v85_3_5_isInputMode) {
+      __v85_3_5_playersToRender = s.players.filter(function(p){ return p && p.type === 'me'; });
+      /* 自分が見つからない異常系のみ全員に戻す（fallback） */
+      if (!__v85_3_5_playersToRender.length) __v85_3_5_playersToRender = s.players;
+    }
+
+    __v85_3_5_playersToRender.forEach(function(p){
       const tr = document.createElement('tr');
       if (p.type === 'me') tr.classList.add('row-me');
       const tdName = document.createElement('td');

@@ -5464,28 +5464,38 @@ _bindSafe('orientation',     bindOrientation);
     return !s.joinMode;
   }
   function openInviteQR(){
-    const s = Store.get();
-    if (!s.roundId || !s.groupId) {
-      toast('先に「ラウンド開始」を押してください', true);
-      setScreen('prep');
-      return;
-    }
-    if (!isHostForInvite_()) {
-      toast('招待QRはホスト端末でのみ発行できます', true);
-      return;
-    }
-    /* v71.3.6 hotfix : ベースURL確定 + キャッシュ破り (&t=Date.now()) */
-    const base = (GW_BOOT.webAppUrl || location.href).split('?')[0];
-    const url = base + '?join=' + encodeURIComponent(s.groupId) + '&t=' + Date.now();
-    GWQR.render($('#inviteQR'), url, 220);
-    GWDom.setText($('#inviteUrl'), url);
-    /* v71.2.3 : URL コピーボタン bind (毎回上書きでOK) */
-    const copyBtn = document.getElementById('btnCopyInviteUrl');
-    if (copyBtn) {
-      copyBtn.onclick = function(){ copyInviteURL_(url); };
-    }
-    openModal('gmInvite');
+  const s = Store.get();
+
+  if (!s.roundId || !s.groupId) {
+    toast('先に「ラウンド開始」を押してください', true);
+    setScreen('prep');
+    return;
   }
+
+  if (!isHostForInvite_()) {
+    toast('招待QRはホスト端末でのみ発行できます', true);
+    return;
+  }
+
+  // v85.1.1 FIX:
+  // 招待URLのベースは必ず「今開いているGitHub PagesのURL」を使う
+  // GASの /exec URL は絶対に使わない
+  const base = location.origin + location.pathname;
+  const url  = base + '?join=' + encodeURIComponent(s.groupId) + '&t=' + Date.now();
+
+  GWQR.render($('#inviteQR'), url, 220);
+  GWDom.setText($('#inviteUrl'), url);
+
+  const copyBtn = document.getElementById('btnCopyInviteUrl');
+  if (copyBtn) {
+    copyBtn.onclick = function(){
+      copyInviteURL_(url);
+    };
+  }
+
+  openModal('gmInvite');
+}
+
 
   /* v71.2.3 : 招待URLをクリップボードへ。
    *  Clipboard API が使えない環境用に textarea + execCommand フォールバック付き。 */

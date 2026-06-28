@@ -1260,6 +1260,285 @@ body.scr-register .bottom-nav{ display:none; }
 .mode-pane{ display:none; }
 .mode-pane.is-active{ display:block; }
 
+/* ============================================================
+ * v85.3.0 : 入力モード PRO (1ページ完結型)
+ * A案 : スリム常時表示ツールバー + 上=チーム表示 + 中=広告 + 下=自分入力
+ * ============================================================ */
+#paneInputPro{
+  display:none;
+  flex-direction:column;
+  height: calc(100vh - 220px);
+  min-height: 560px;
+  max-height: 900px;
+  padding: 0;
+  margin: 8px 0 0 0;
+  background: #f7f8fa;
+  border-radius: 12px;
+  overflow:hidden;
+  border: 1px solid #e3e6ea;
+}
+#paneInputPro.is-active{ display:flex; }
+
+/* ----- スリムツールバー (高さ40px固定 / 横スクロール可) ----- */
+.ipro-toolbar{
+  flex: 0 0 auto;
+  height: 40px;
+  background: #ffffff;
+  border-bottom: 1px solid #e3e6ea;
+  display:flex;
+  align-items:center;
+  gap: 4px;
+  padding: 0 6px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width: none;
+}
+.ipro-toolbar::-webkit-scrollbar{ display:none; }
+.ipro-tb-btn{
+  flex: 0 0 auto;
+  height: 32px;
+  min-width: 36px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid #d8dde3;
+  background: #f4f5f7;
+  font-size: 12px;
+  color: #2a3140;
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  cursor:pointer;
+  white-space:nowrap;
+  user-select:none;
+  -webkit-tap-highlight-color: transparent;
+}
+.ipro-tb-btn:hover{ background:#eef0f3; }
+.ipro-tb-btn.is-close{
+  background:#fef2f2;
+  border-color:#fecaca;
+  color:#b91c1c;
+}
+.ipro-tb-ico{ font-size: 14px; line-height: 1; }
+.ipro-tb-val{ font-weight: 600; font-size: 11px; }
+.ipro-tb-sep{ flex: 0 0 1px; width:1px; height:20px; background:#e3e6ea; margin: 0 2px; }
+.ipro-tb-sync{ background:#ecfdf5; border-color:#a7f3d0; color:#047857; }
+.ipro-tb-sync.is-warn{ background:#fffbeb; border-color:#fde68a; color:#b45309; }
+.ipro-tb-sync.is-err{  background:#fef2f2; border-color:#fecaca; color:#b91c1c; }
+
+/* ----- 上: 同伴者スコア表 (コンパクト, 約20-25%) ----- */
+.ipro-team{
+  flex: 0 1 auto;
+  max-height: 28vh;
+  overflow:auto;
+  background:#ffffff;
+  border-bottom:1px solid #e3e6ea;
+  padding: 6px 8px;
+}
+.ipro-team-title{
+  font-size: 11px;
+  color:#6b7280;
+  margin: 0 0 4px 0;
+  padding-left:2px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.ipro-team-title .ipro-team-tip{ font-size:10px; color:#9ca3af; }
+.ipro-team-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size: 11px;
+}
+.ipro-team-table th, .ipro-team-table td{
+  border: 1px solid #e3e6ea;
+  padding: 2px 4px;
+  text-align:center;
+  height: 22px;
+  background:#ffffff;
+}
+.ipro-team-table th{
+  background:#f4f5f7;
+  font-weight:600;
+  color:#374151;
+  font-size:10px;
+}
+.ipro-team-table td.tm-name{
+  text-align:left;
+  font-weight:600;
+  background:#fafbfc;
+  white-space:nowrap;
+  max-width: 70px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-size:10px;
+}
+.ipro-team-table tr.is-self td.tm-name{ color:#047857; }
+.ipro-team-table tr.is-self td{ background:#ecfdf5; }
+.ipro-team-table td.tm-total{ font-weight:700; background:#f9fafb; }
+
+/* ----- 中: 広告・告知エリア (死守) ----- */
+.ipro-ad{
+  flex: 1 1 auto;
+  min-height: 80px;
+  background: repeating-linear-gradient(45deg, #fafafa, #fafafa 6px, #f3f4f6 6px, #f3f4f6 12px);
+  border-bottom:1px solid #e3e6ea;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#9ca3af;
+  font-size: 12px;
+  position:relative;
+  overflow:hidden;
+}
+.ipro-ad-placeholder{
+  text-align:center;
+  font-weight:600;
+  letter-spacing:0.04em;
+}
+.ipro-ad-placeholder small{
+  display:block;
+  font-size:10px;
+  color:#b0b6bf;
+  margin-top: 4px;
+  font-weight:400;
+}
+
+/* ----- 下: 自分入力エリア (約50-55%, 親指ホットゾーン) ----- */
+.ipro-self{
+  flex: 0 0 auto;
+  background:#ffffff;
+  border-top: 2px solid #10b981;
+  padding: 10px 12px 14px 12px;
+  display:flex;
+  flex-direction:column;
+  gap: 8px;
+}
+.ipro-self-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.ipro-self-name{
+  font-size: 13px;
+  font-weight:700;
+  color: #047857;
+  display:flex; align-items:center; gap:6px;
+}
+.ipro-self-name::before{
+  content:"🎯";
+  font-size: 14px;
+}
+.ipro-self-hole{
+  font-size: 13px;
+  font-weight:700;
+  color:#1f2937;
+  background:#ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.ipro-self-grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.ipro-stepper{
+  background:#f9fafb;
+  border:1px solid #e3e6ea;
+  border-radius: 10px;
+  padding: 8px 8px 10px 8px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+}
+.ipro-stepper-lbl{
+  font-size: 11px;
+  color: #6b7280;
+  font-weight:600;
+}
+.ipro-stepper-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.ipro-stepper-btn{
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid #d8dde3;
+  background:#ffffff;
+  font-size: 22px;
+  font-weight:700;
+  color: #1f2937;
+  cursor:pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select:none;
+}
+.ipro-stepper-btn:active{ background:#e5e7eb; transform:scale(0.96); }
+.ipro-stepper-val{
+  min-width: 56px;
+  text-align:center;
+  font-size: 28px;
+  font-weight:800;
+  color:#10b981;
+  line-height:1;
+}
+.ipro-stepper.is-putt .ipro-stepper-val{ color:#0ea5e9; }
+.ipro-commit-row{
+  display:flex;
+  gap: 8px;
+}
+.ipro-commit-btn{
+  flex: 1 1 auto;
+  height: 50px;
+  border-radius: 12px;
+  border:none;
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  color:#fff;
+  font-size: 16px;
+  font-weight:800;
+  letter-spacing:0.04em;
+  cursor:pointer;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 2px 6px rgba(16,185,129,0.30);
+}
+.ipro-commit-btn:active{ transform: translateY(1px); box-shadow:none; }
+.ipro-commit-btn:disabled{
+  background:#cbd5e1;
+  box-shadow:none;
+  cursor:not-allowed;
+}
+.ipro-skip-btn{
+  flex: 0 0 80px;
+  height: 50px;
+  border-radius:12px;
+  border:1px solid #d8dde3;
+  background:#ffffff;
+  font-size: 12px;
+  color:#6b7280;
+  cursor:pointer;
+}
+
+/* ----- 「入力モード PRO」スイッチャ ボタン (card-modeswitch 内) ----- */
+.cms-btn.cms-pro{
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  color:#fff !important;
+  border-color: #047857 !important;
+}
+.cms-btn.cms-pro.is-active{
+  box-shadow: 0 2px 6px rgba(16,185,129,0.40);
+}
+
+/* ----- 入力モード PRO 起動時は dash や mode-switch を隠してフルスクリーン化 ----- */
+.card-pro-fullscreen .card-dash,
+.card-pro-fullscreen #roundMismatchWarning{
+  display:none !important;
+}
+.card-pro-fullscreen .card-modeswitch{
+  margin-bottom: 0;
+}
+
+
 /* ----- 自分入力 pane のメタ情報 ----- */
 .pane-meta{
   display:flex; justify-content:space-between; align-items:center;
@@ -1861,6 +2140,9 @@ body.scr-register .bottom-nav{ display:none; }
       <button class="cms-btn cms-host is-guest-hidden" data-mode="hostCheck" id="btnOpenHostCheck" type="button">
         <span class="cms-ico">🛡</span>監督
       </button>
+      <button class="cms-btn cms-pro" data-mode="inputPro" id="btnSwitchToInputPro" type="button">
+        <span class="cms-ico">🎯</span>PRO
+      </button>
     </div>
 
     <!-- ===== Pane A : 自分入力 (既存スコアカードをラップ) ===== -->
@@ -1894,6 +2176,85 @@ body.scr-register .bottom-nav{ display:none; }
       </div>
       <div class="hc-list" id="hostCheckList">
         <div class="hc-empty">読み込み中…</div>
+      </div>
+    </div>
+
+    <!-- ===== Pane D : 入力モード PRO (1ページ完結型) v85.3.0 ===== -->
+    <div class="mode-pane" id="paneInputPro">
+      <!-- スリムツールバー -->
+      <div class="ipro-toolbar" id="iproToolbar">
+        <button class="ipro-tb-btn is-close" id="iproBtnClose" type="button" aria-label="閉じる">
+          <span class="ipro-tb-ico">←</span><span>閉じる</span>
+        </button>
+        <div class="ipro-tb-sep"></div>
+        <button class="ipro-tb-btn" id="iproBtnTee" type="button">
+          <span class="ipro-tb-ico">⛳</span><span class="ipro-tb-val" id="iproTeeVal">REG</span>
+        </button>
+        <button class="ipro-tb-btn" id="iproBtnHoles" type="button">
+          <span class="ipro-tb-ico">🏁</span><span class="ipro-tb-val" id="iproHolesVal">18H</span>
+        </button>
+        <button class="ipro-tb-btn" id="iproBtnLocker" type="button">
+          <span class="ipro-tb-ico">🔐</span><span class="ipro-tb-val" id="iproLockerVal">L―</span>
+        </button>
+        <button class="ipro-tb-btn" id="iproBtnCot" type="button">
+          <span class="ipro-tb-ico">🕒</span><span class="ipro-tb-val" id="iproCotVal">--:--</span>
+        </button>
+        <div class="ipro-tb-sep"></div>
+        <button class="ipro-tb-btn" id="iproBtnInvite" type="button">
+          <span class="ipro-tb-ico">📷</span><span>招待</span>
+        </button>
+        <button class="ipro-tb-btn ipro-tb-sync" id="iproBtnSync" type="button">
+          <span class="ipro-tb-ico">📡</span><span class="ipro-tb-val" id="iproSyncVal">同期</span>
+        </button>
+      </div>
+
+      <!-- 上: 同伴者スコア表(コンパクト) -->
+      <div class="ipro-team">
+        <div class="ipro-team-title">
+          <span>👥 組のスコア</span>
+          <span class="ipro-team-tip" id="iproTeamSyncAt">最終更新 ―</span>
+        </div>
+        <table class="ipro-team-table" id="iproTeamTable">
+          <thead></thead><tbody></tbody>
+        </table>
+      </div>
+
+      <!-- 中: 広告・告知エリア(死守) -->
+      <div class="ipro-ad" id="iproAdSlot">
+        <div class="ipro-ad-placeholder">
+          📢 広告・告知スペース
+          <small>ここに広告 / お知らせを配信予定</small>
+        </div>
+      </div>
+
+      <!-- 下: 自分入力エリア(親指ホットゾーン) -->
+      <div class="ipro-self" id="iproSelfBox">
+        <div class="ipro-self-head">
+          <span class="ipro-self-name" id="iproSelfName">自分</span>
+          <span class="ipro-self-hole" id="iproSelfHole">―H</span>
+        </div>
+        <div class="ipro-self-grid">
+          <div class="ipro-stepper">
+            <span class="ipro-stepper-lbl">スコア</span>
+            <div class="ipro-stepper-row">
+              <button class="ipro-stepper-btn" id="iproScoreDown" type="button">−</button>
+              <span class="ipro-stepper-val" id="iproScoreVal">―</span>
+              <button class="ipro-stepper-btn" id="iproScoreUp" type="button">＋</button>
+            </div>
+          </div>
+          <div class="ipro-stepper is-putt">
+            <span class="ipro-stepper-lbl">パット</span>
+            <div class="ipro-stepper-row">
+              <button class="ipro-stepper-btn" id="iproPuttDown" type="button">−</button>
+              <span class="ipro-stepper-val" id="iproPuttVal">―</span>
+              <button class="ipro-stepper-btn" id="iproPuttUp" type="button">＋</button>
+            </div>
+          </div>
+        </div>
+        <div class="ipro-commit-row">
+          <button class="ipro-skip-btn" id="iproSkipBtn" type="button">前H ←</button>
+          <button class="ipro-commit-btn" id="iproCommitBtn" type="button">✅ 確定 → 次H</button>
+        </div>
       </div>
     </div>
       <div id="finish-round-slot"></div>
@@ -2219,7 +2580,7 @@ body.scr-register .bottom-nav{ display:none; }
      *   ⑤ クライアント保存バージョンとの差分を判定 (state.html へバトンタッチ)
      * ============================================================ */
     window.GW_BOOT = {
-      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.0.0",
+      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.0",
       versionCode   : 85000,
       buildAt       : new Date().toISOString(),
       course        : "Rokko Kokusai Public",
@@ -2227,7 +2588,7 @@ body.scr-register .bottom-nav{ display:none; }
       urlVersion    : "",
       webAppUrl     : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.GAS_WEB_APP_URL) || "",
       cacheBuster   : "v85",
-      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.0.0"
+      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.0"
     };
     (function(){
       try {
@@ -4552,7 +4913,8 @@ _bindSafe('orientation',     bindOrientation);
       var panes = {
         input:     document.getElementById('paneInput'),
         board:     document.getElementById('paneBoard'),
-        hostCheck: document.getElementById('paneHostCheck')
+        hostCheck: document.getElementById('paneHostCheck'),
+        inputPro:  document.getElementById('paneInputPro')
       };
       Object.keys(panes).forEach(function(k){
         if (!panes[k]) return;
@@ -4564,6 +4926,12 @@ _bindSafe('orientation',     bindOrientation);
         if (b.getAttribute('data-mode') === mode) b.classList.add('is-active');
         else                                       b.classList.remove('is-active');
       });
+      // v85.3.0 : PRO 起動時はダッシュも隠してフルスクリーン化
+      var screenCard = document.getElementById('screen-card');
+      if (screenCard) {
+        if (mode === 'inputPro') screenCard.classList.add('card-pro-fullscreen');
+        else                     screenCard.classList.remove('card-pro-fullscreen');
+      }
     }
     _safeBind('#btnSwitchToInput',  'click', function(){ activatePane('input'); });
     _safeBind('#btnSwitchToBoard',  'click', function(){
@@ -4577,6 +4945,198 @@ _bindSafe('orientation',     bindOrientation);
     _safeBind('#btnRefreshBoard',   'click', function(){
       try { if (typeof renderBoard === 'function') renderBoard(); } catch(_){ }
     });
+    // v85.3.0 : 入力モード PRO 切替
+    _safeBind('#btnSwitchToInputPro','click', function(){
+      activatePane('inputPro');
+      try { if (typeof renderInputPro === 'function') renderInputPro(); } catch(e){ console.warn('[PRO] render error', e); }
+    });
+    // v85.3.0 : PRO 内の「閉じる」ボタン -> 組表示へ
+    _safeBind('#iproBtnClose', 'click', function(){
+      activatePane('board');
+      try { if (typeof renderBoard === 'function') renderBoard(); } catch(_){ }
+    });
+    // v85.3.0 : PRO 内のツールバー -> 既存ダッシュボタンに委譲
+    _safeBind('#iproBtnTee',   'click', function(){ var b=document.getElementById('dashTeeBtn');    if(b) b.click(); });
+    _safeBind('#iproBtnHoles', 'click', function(){ var b=document.getElementById('dashHolesBtn');  if(b) b.click(); });
+    _safeBind('#iproBtnLocker','click', function(){ var b=document.getElementById('dashLockerBtn'); if(b) b.click(); });
+    _safeBind('#iproBtnCot',   'click', function(){ var b=document.getElementById('dashCotBtn');    if(b) b.click(); });
+    _safeBind('#iproBtnInvite','click', function(){ var b=document.getElementById('btnShowInviteQRCard'); if(b) b.click(); });
+    _safeBind('#iproBtnSync',  'click', function(){
+      try { if (typeof renderInputPro === 'function') renderInputPro(); } catch(_){ }
+      try { if (typeof renderBoard    === 'function') renderBoard(); }    catch(_){ }
+    });
+  }
+
+  /* ============================================================
+   * v85.3.0 : 入力モード PRO (1ページ完結型) ロジック
+   * - 同伴者スコア表(上) + 広告(中) + 自分入力ステッパ(下)
+   * - 既存の dbUpdateScore / Store / Round を流用
+   * ============================================================ */
+  var IPRO_STATE = {
+    holeNo: 1,
+    score:  null,
+    putt:   null,
+    dirty:  false
+  };
+
+  function renderInputPro(){
+    try {
+      var s = (window.Store && Store.get && Store.get()) || {};
+      var rnd = s.round || {};
+      var self = s.self || s.user || {};
+      var selfName = (self.nickname || self.familyName || '自分');
+      var holes = rnd.holes || 18;
+
+      // ツールバー値を既存のdashから同期
+      var $ = function(sel){ return document.querySelector(sel); };
+      function copyText(srcId, dstId){
+        var a = document.getElementById(srcId);
+        var b = document.getElementById(dstId);
+        if (a && b) b.textContent = (a.textContent || '').trim() || b.textContent;
+      }
+      copyText('dashTee',    'iproTeeVal');
+      copyText('dashHoles',  'iproHolesVal');
+      copyText('dashLocker', 'iproLockerVal');
+      copyText('dashCot',    'iproCotVal');
+      copyText('dashSync',   'iproSyncVal');
+      var bmAt = document.getElementById('bmLastSyncAt');
+      var iproAt = document.getElementById('iproTeamSyncAt');
+      if (bmAt && iproAt) iproAt.textContent = '最終更新 ' + (bmAt.textContent || '―');
+
+      // 自分の名前
+      var selfNameEl = document.getElementById('iproSelfName');
+      if (selfNameEl) selfNameEl.textContent = '自分 ' + selfName;
+
+      // 「次の未入力ホール」を推定 (既存 utility があれば流用)
+      var myScores = (rnd.scores && (rnd.scores[self.userId] || rnd.scores[selfName])) || {};
+      var nextHole = 1;
+      for (var i = 1; i <= holes; i++) {
+        var v = myScores[i] || (myScores['h' + i]);
+        var sv = (v && (v.score != null)) ? v.score : v;
+        if (sv == null || sv === '' || sv === 0) { nextHole = i; break; }
+        if (i === holes) nextHole = holes;
+      }
+      IPRO_STATE.holeNo = nextHole;
+      var cur = myScores[nextHole] || myScores['h' + nextHole] || {};
+      IPRO_STATE.score = (cur.score != null) ? Number(cur.score) : null;
+      IPRO_STATE.putt  = (cur.putt  != null) ? Number(cur.putt)  : null;
+      IPRO_STATE.dirty = false;
+
+      var holeEl  = document.getElementById('iproSelfHole');
+      var scoreEl = document.getElementById('iproScoreVal');
+      var puttEl  = document.getElementById('iproPuttVal');
+      if (holeEl)  holeEl.textContent  = nextHole + 'H';
+      if (scoreEl) scoreEl.textContent = (IPRO_STATE.score == null) ? '―' : IPRO_STATE.score;
+      if (puttEl)  puttEl.textContent  = (IPRO_STATE.putt  == null) ? '―' : IPRO_STATE.putt;
+
+      // 同伴者スコア表(コンパクト)
+      renderIproTeam(rnd, self, holes);
+    } catch(e) {
+      console.error('[renderInputPro] failed', e);
+    }
+  }
+
+  function renderIproTeam(rnd, self, holes){
+    var table = document.getElementById('iproTeamTable');
+    if (!table) return;
+    var members = (rnd.members || []).slice();
+    if (!members.length && self) members = [self];
+
+    var firstHalf = Math.min(9, holes);
+    var head = '<tr><th class="tm-name">名前</th>';
+    for (var h = 1; h <= firstHalf; h++) head += '<th>' + h + '</th>';
+    if (holes > 9) head += '<th>OUT</th>';
+    head += '<th class="tm-total">TOT</th></tr>';
+
+    var body = '';
+    members.forEach(function(m){
+      var name = m.nickname || m.familyName || '―';
+      var isSelf = (self && (m.userId === self.userId || name === (self.nickname || self.familyName)));
+      var rowCls = isSelf ? ' class="is-self"' : '';
+      body += '<tr' + rowCls + '><td class="tm-name">' + (name.length > 6 ? name.slice(0,6) : name) + '</td>';
+      var scores = (rnd.scores && (rnd.scores[m.userId] || rnd.scores[name])) || {};
+      var sum = 0, out = 0, hasAny = false;
+      for (var h = 1; h <= firstHalf; h++) {
+        var v = scores[h] || scores['h' + h] || {};
+        var s = (v.score != null) ? Number(v.score) : null;
+        if (s != null && !isNaN(s)) { sum += s; out += s; hasAny = true; }
+        body += '<td>' + (s != null && !isNaN(s) ? s : '') + '</td>';
+      }
+      if (holes > 9) body += '<td class="tm-total">' + (hasAny ? out : '') + '</td>';
+      // 後半も足す
+      for (var h2 = 10; h2 <= holes; h2++) {
+        var v2 = scores[h2] || scores['h' + h2] || {};
+        var s2 = (v2.score != null) ? Number(v2.score) : null;
+        if (s2 != null && !isNaN(s2)) sum += s2;
+      }
+      body += '<td class="tm-total">' + (hasAny ? sum : '') + '</td></tr>';
+    });
+    var thead = table.querySelector('thead');
+    var tbody = table.querySelector('tbody');
+    if (thead) thead.innerHTML = head;
+    if (tbody) tbody.innerHTML = body;
+  }
+
+  /* ステッパ / 確定ボタン バインド */
+  function bindInputProSteppers(){
+    function step(key, delta){
+      var v = IPRO_STATE[key];
+      v = (v == null ? 0 : Number(v)) + delta;
+      if (key === 'score') v = Math.max(1, Math.min(15, v));
+      if (key === 'putt')  v = Math.max(0, Math.min(10, v));
+      IPRO_STATE[key] = v;
+      IPRO_STATE.dirty = true;
+      var el = document.getElementById(key === 'score' ? 'iproScoreVal' : 'iproPuttVal');
+      if (el) el.textContent = v;
+    }
+    _safeBind('#iproScoreDown','click', function(){ step('score', -1); });
+    _safeBind('#iproScoreUp',  'click', function(){ step('score',  1); });
+    _safeBind('#iproPuttDown', 'click', function(){ step('putt',  -1); });
+    _safeBind('#iproPuttUp',   'click', function(){ step('putt',   1); });
+    _safeBind('#iproSkipBtn',  'click', function(){
+      if (IPRO_STATE.holeNo > 1) IPRO_STATE.holeNo--;
+      try { renderInputPro(); } catch(_){ }
+    });
+    _safeBind('#iproCommitBtn','click', function(){
+      try {
+        if (IPRO_STATE.score == null) {
+          if (typeof toast === 'function') toast('スコアを入力してください', true);
+          return;
+        }
+        // 既存の openPanelByHoleNo / dbUpdateScore があれば連動
+        var s = (window.Store && Store.get && Store.get()) || {};
+        var self = s.self || s.user || {};
+        var name = (self.nickname || self.familyName || '');
+        // 1) 既存パネル経由で保存(信頼性高い)
+        if (typeof openPanelByHoleNo === 'function') {
+          openPanelByHoleNo(name, IPRO_STATE.holeNo, false);
+          // パネル内のスコア/パットを反映する hook
+          try {
+            var sIn = document.querySelector('#scorePanel input[name="score"], #panelScore');
+            var pIn = document.querySelector('#scorePanel input[name="putt"],  #panelPutt');
+            if (sIn) { sIn.value = IPRO_STATE.score; sIn.dispatchEvent(new Event('input',{bubbles:true})); }
+            if (pIn) { pIn.value = (IPRO_STATE.putt == null ? '' : IPRO_STATE.putt); pIn.dispatchEvent(new Event('input',{bubbles:true})); }
+            var ok = document.querySelector('#scorePanel .panel-ok, #panelOk, #btnPanelConfirm');
+            if (ok) ok.click();
+          } catch(_){ }
+        }
+        if (typeof toast === 'function') toast(IPRO_STATE.holeNo + 'H 確定: ' + IPRO_STATE.score);
+        // 次のホールへ
+        var holes = (s.round && s.round.holes) || 18;
+        if (IPRO_STATE.holeNo < holes) IPRO_STATE.holeNo++;
+        IPRO_STATE.score = null;
+        IPRO_STATE.putt  = null;
+        setTimeout(function(){ try{ renderInputPro(); }catch(_){} }, 300);
+      } catch(e) {
+        console.error('[ipro commit]', e);
+        if (typeof toast === 'function') toast('確定に失敗しました', true);
+      }
+    });
+  }
+  try { document.addEventListener('DOMContentLoaded', bindInputProSteppers); } catch(_){ }
+  // 既に DOM 準備済みなら即時バインド
+  if (document.readyState !== 'loading') {
+    try { bindInputProSteppers(); } catch(_){ }
   }
 
   /* ============================================================

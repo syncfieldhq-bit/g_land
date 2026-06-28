@@ -1261,8 +1261,9 @@ body.scr-register .bottom-nav{ display:none; }
 .mode-pane.is-active{ display:block; }
 
 /* ============================================================
- * v85.3.2 PWA-FIX : ステータスバーぶんの上余白を全画面で確保
- *  + PRO ツールバーは padding-top: max(env, 12px) で確実に底上げ
+ * v85.3.3 PWA-FIX : ステータスバーぶんの上余白を全画面で確保
+ *  + PRO ツールバーは padding-top: calc(env + 42px) で必ず加算
+ *  + Par 値ホール別化 / IN・TOT 列可視化
  * ============================================================ */
 :root { --gw-safe-top: env(safe-area-inset-top, 0px); }
 #screen-card .card-dash{
@@ -1308,7 +1309,7 @@ button, .dash-cell, .card-side-close, .card-side-qr,
   align-items:center;
   gap: 4px;
   padding: 0 6px;
-  padding-top: max(env(safe-area-inset-top), 12px); /* v85.3.2: PWAでステータスバー貫通防止 */
+  padding-top: calc(env(safe-area-inset-top) + 42px); /* v85.3.3: 必ず加算で底上げ（maxだけでは効かない問題に対応） */
   overflow-x:auto;
   overflow-y:hidden;
   scrollbar-width: none;
@@ -1347,9 +1348,12 @@ button, .dash-cell, .card-side-close, .card-side-qr,
 
 /* ----- 上: 同伴者スコア表 (コンパクト, 約20-25%) ----- */
 .ipro-team{
-  flex: 0 1 auto;
-  max-height: 28vh;
-  overflow:auto;
+  /* v85.3.3 : 縦は抑制、横スクロールで IN/TOT も自然に見える */
+  flex: 0 0 auto;
+  max-height: 36vh;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   background:#ffffff;
   border-bottom:1px solid #e3e6ea;
   padding: 6px 8px;
@@ -1363,7 +1367,9 @@ button, .dash-cell, .card-side-close, .card-side-qr,
 }
 .ipro-team-title .ipro-team-tip{ font-size:10px; color:#9ca3af; }
 .ipro-team-table{
-  width:100%;
+  /* v85.3.3 : 18ホール+OUT/IN/TOT 全列を横スクロールで自然表示 */
+  width: auto;
+  min-width: max-content;
   border-collapse:collapse;
   font-size: 11px;
 }
@@ -2600,7 +2606,7 @@ button, .dash-cell, .card-side-close, .card-side-qr,
      *   ⑤ クライアント保存バージョンとの差分を判定 (state.html へバトンタッチ)
      * ============================================================ */
     window.GW_BOOT = {
-      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.2",
+      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.3",
       versionCode   : 85000,
       buildAt       : new Date().toISOString(),
       course        : "Rokko Kokusai Public",
@@ -2608,7 +2614,7 @@ button, .dash-cell, .card-side-close, .card-side-qr,
       urlVersion    : "",
       webAppUrl     : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.GAS_WEB_APP_URL) || "",
       cacheBuster   : "v85",
-      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.2"
+      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.3"
     };
     (function(){
       try {
@@ -2710,6 +2716,23 @@ window.COURSE = {
     {no:18,par:4,regYard:370,ladiesYard:297,hdcp:8, wc:false}
   ]
 };
+
+/* v85.3.3 : Par 値ホール別マップ（courses[0].holes[*].par から自動構築） */
+window.HOLE_PAR_MAP = (function(){
+  try {
+    var map = {};
+    var src = (typeof courses !== 'undefined' && courses && courses.holes) ? courses.holes
+            : (typeof COURSE  !== 'undefined' && COURSE  && COURSE.holes)  ? COURSE.holes
+            : null;
+    if (src && src.length) {
+      for (var i = 0; i < src.length; i++) {
+        var h = src[i];
+        if (h && h.no != null && h.par != null) map[h.no] = Number(h.par);
+      }
+    }
+    return map;
+  } catch(_){ return {}; }
+})();
 
 window.getHoleByNo = function(no){
   const n = Number(no);
@@ -4996,11 +5019,17 @@ _bindSafe('orientation',     bindOrientation);
   var IPRO_DEFAULT_PAR  = 4;
   var IPRO_DEFAULT_PUTT = 2;
   function iproGetPar(holeNo, rnd){
+    /* v85.3.3: ホール別 Par 取得 — 優先順位 ①rnd.pars ②HOLE_PAR_MAP ③courses直接 ④fallback4 */
     try {
       if (rnd && rnd.pars && rnd.pars[holeNo] != null) return Number(rnd.pars[holeNo]);
       if (rnd && rnd.par  && rnd.par[holeNo]  != null) return Number(rnd.par[holeNo]);
       if (window.HOLE_PAR_MAP && window.HOLE_PAR_MAP[holeNo] != null)
         return Number(window.HOLE_PAR_MAP[holeNo]);
+      /* v85.3.3 : courses 定数を直接参照（HOLE_PAR_MAP 構築失敗時の保険） */
+      var src = (typeof courses !== 'undefined' && courses && courses.holes) ? courses.holes
+              : (typeof COURSE  !== 'undefined' && COURSE  && COURSE.holes)  ? COURSE.holes
+              : null;
+      if (src && src[holeNo - 1] && src[holeNo - 1].par != null) return Number(src[holeNo - 1].par);
     } catch(_){}
     return IPRO_DEFAULT_PAR;
   }
@@ -5017,6 +5046,10 @@ _bindSafe('orientation',     bindOrientation);
     try {
       var s = (window.Store && Store.get && Store.get()) || {};
       var rnd = s.round || {};
+      /* v85.3.3 : 注意 — 「プロ画面/組表示に自分の名前が出ない」問題（佐藤が表示されない件）は
+         保留中。原因は GAS が返す user オブジェクトのキー名（dispName / name / familyName 等）が
+         想定と食い違う可能性。setSelf -> State 直下書き込みの経路と整合させる必要があり、
+         触ると別箇所（paneBoard / 組表示）を壊すリスクがあるため、v85.3.4 以降で別タスクとして対応。 */
       var self = s.self || s.user || {};
       // v85.3.1 : 「自分 佐藤」用の表示名 (familyName 優先, fallback: nickname)
       /* v85.3.2: displayName キー揺れ対策 (家族姓>名前>表示名>ニック>ユーザー名) */

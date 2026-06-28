@@ -1588,6 +1588,100 @@ button, .dash-cell, .card-side-close, .card-side-qr,
 .pane-meta .pi-saved{ color:#678; }
 .pane-meta .pi-saved em{ color:#2b8a4c; font-style:normal; font-weight:700; }
 
+/* ==========================================================
+ * v85.3.6 : 情報交換エリア (広告 / 告知 / 3ボタン)
+ *   - paneInput の cardScroll 直下に配置
+ *   - スコアカードを邪魔せず、フッターまでのスペースを有効活用
+ * ========================================================== */
+.info-zone{
+  margin: 16px 12px 24px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* ① 広告枠 (80px 程度) */
+.info-ad{
+  min-height: 76px;
+  border: 1.5px dashed #d4c45a;
+  background: linear-gradient(180deg, #fff9e0 0%, #fff5c8 100%);
+  border-radius: 10px;
+  display:flex; align-items:center; justify-content:center;
+  padding: 8px 12px;
+}
+.info-ad-placeholder{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+.info-ad-tag{
+  font-size:11px; font-weight:800; color:#8a6a00;
+  background:#fde85b; padding:2px 8px; border-radius:8px;
+}
+.info-ad-msg{ font-size:12px; color:#9a7a18; }
+
+/* ② 告知欄 (60px 程度) */
+.info-notice{
+  min-height: 56px;
+  border: 1px solid #c7e0c9;
+  background: #f3fbf4;
+  border-radius: 10px;
+  padding: 8px 12px;
+  display:flex; flex-direction:column; gap:4px;
+}
+.info-notice-head{
+  display:flex; align-items:center; justify-content:space-between;
+  font-size: 12px; color:#2b8a4c; font-weight:700;
+}
+.info-notice-tag{ letter-spacing:.02em; }
+.info-notice-time{ color:#6c8b75; font-weight:500; font-size:11px; }
+.info-notice-body{
+  font-size: 13px; color:#234; line-height:1.4;
+}
+
+/* ③ 情報交換ボタン (3つ横並び) */
+.info-actions{
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+.info-btn{
+  appearance:none; -webkit-appearance:none;
+  background: linear-gradient(180deg, #ffffff 0%, #f3f6f9 100%);
+  border: 1.5px solid #c2cfd9;
+  border-radius: 12px;
+  padding: 12px 6px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap: 4px;
+  cursor: pointer;
+  transition: transform .08s ease, box-shadow .15s ease, background .15s ease;
+  min-height: 72px;
+  box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 2px 4px rgba(0,0,0,.03);
+}
+.info-btn:active{ transform: scale(.96); background:#eaf0f5; }
+.info-btn:hover{ background:#f6f9fc; }
+.info-btn-ico{
+  font-size: 28px;
+  line-height: 1;
+}
+.info-btn-lbl{
+  font-size: 12px; font-weight:700; color:#36506e;
+  letter-spacing:.02em;
+}
+
+/* PRO ボタン COMING SOON バッジ */
+.cms-btn.is-coming-soon{ position:relative; opacity:.78; }
+.cms-btn.is-coming-soon .cms-cs-badge{
+  position:absolute; top:-6px; right:-4px;
+  font-size:9px; font-weight:800; line-height:1;
+  background:#e08a00; color:#fff;
+  padding:3px 5px; border-radius:6px;
+  letter-spacing:.04em;
+  box-shadow: 0 1px 2px rgba(0,0,0,.18);
+  pointer-events:none;
+}
+
+/* 入力パネル(スコア入力中) が表に出てる時は情報交換エリアを隠す
+   将来 body に .is-score-pad-open が付いたら自動で消える */
+body.is-score-pad-open .info-zone{ display:none !important; }
+/* paneInput が非アクティブ (組表示/監督席/PRO) のときは そのpaneごと隠れるので追加CSS不要 */
+
+
 /* ----- 保存状態セル ----- */
 .ct-state{ width:24px; text-align:center; font-size:13px; }
 .ct-state .cell-empty   { color:#aab; }
@@ -2178,8 +2272,9 @@ button, .dash-cell, .card-side-close, .card-side-qr,
       <button class="cms-btn cms-host is-guest-hidden" data-mode="hostCheck" id="btnOpenHostCheck" type="button">
         <span class="cms-ico">🛡</span>監督
       </button>
-      <button class="cms-btn cms-pro" data-mode="inputPro" id="btnSwitchToInputPro" type="button">
+      <button class="cms-btn cms-pro is-coming-soon" data-mode="inputPro" id="btnSwitchToInputPro" type="button" aria-label="PRO (準備中)">
         <span class="cms-ico">🎯</span>PRO
+        <span class="cms-cs-badge">準備中</span>
       </button>
     </div>
 
@@ -2192,6 +2287,43 @@ button, .dash-cell, .card-side-close, .card-side-qr,
       <div class="card-scroll" id="cardScroll">
         <table class="card-table" id="cardTable"><thead></thead><tbody></tbody></table>
       </div>
+
+      <!-- ===== v85.3.6 : 情報交換エリア (paneInput 内・スコアカード直下) ===== -->
+      <div class="info-zone" id="infoZone" aria-label="広告・告知・情報交換">
+        <!-- ① 広告枠 -->
+        <div class="info-ad" id="infoAdSlot">
+          <div class="info-ad-placeholder">
+            <span class="info-ad-tag">広告</span>
+            <span class="info-ad-msg">ここに広告が表示されます</span>
+          </div>
+        </div>
+        <!-- ② 告知欄 -->
+        <div class="info-notice" id="infoNoticeSlot">
+          <div class="info-notice-head">
+            <span class="info-notice-tag">📢 告知</span>
+            <span class="info-notice-time" id="infoNoticeTime">—</span>
+          </div>
+          <div class="info-notice-body" id="infoNoticeBody">
+            お知らせはありません
+          </div>
+        </div>
+        <!-- ③ 情報交換ボタン (3つ横並び) -->
+        <div class="info-actions">
+          <button class="info-btn" id="infoBtnPhoto" type="button" aria-label="写真UP">
+            <span class="info-btn-ico">📷</span>
+            <span class="info-btn-lbl">写真UP</span>
+          </button>
+          <button class="info-btn" id="infoBtnCopy" type="button" aria-label="スコアコピー">
+            <span class="info-btn-ico">📋</span>
+            <span class="info-btn-lbl">ｺﾋﾟｰ</span>
+          </button>
+          <button class="info-btn" id="infoBtnLine" type="button" aria-label="LINE">
+            <span class="info-btn-ico">💬</span>
+            <span class="info-btn-lbl">LINE</span>
+          </button>
+        </div>
+      </div>
+      <!-- ===== /v85.3.6 情報交換エリア ===== -->
     </div>
 
     <!-- ===== Pane B : 組表示 (read-only, 横長テーブル) ===== -->
@@ -2618,7 +2750,7 @@ button, .dash-cell, .card-side-close, .card-side-qr,
      *   ⑤ クライアント保存バージョンとの差分を判定 (state.html へバトンタッチ)
      * ============================================================ */
     window.GW_BOOT = {
-      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.5",
+      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.6",
       versionCode   : 85000,
       buildAt       : new Date().toISOString(),
       course        : "Rokko Kokusai Public",
@@ -2626,7 +2758,7 @@ button, .dash-cell, .card-side-close, .card-side-qr,
       urlVersion    : "",
       webAppUrl     : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.GAS_WEB_APP_URL) || "",
       cacheBuster   : "v85",
-      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.5"
+      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.6"
     };
     (function(){
       try {
@@ -5010,11 +5142,21 @@ _bindSafe('orientation',     bindOrientation);
     _safeBind('#btnRefreshBoard',   'click', function(){
       try { if (typeof renderBoard === 'function') renderBoard(); } catch(_){ }
     });
-    // v85.3.0 : 入力モード PRO 切替
-    _safeBind('#btnSwitchToInputPro','click', function(){
-      activatePane('inputPro');
-      try { if (typeof renderInputPro === 'function') renderInputPro(); } catch(e){ console.warn('[PRO] render error', e); }
+    // v85.3.6 : 入力モード PRO は COMING SOON 化 (見える / タップで案内のみ)
+    _safeBind('#btnSwitchToInputPro','click', function(ev){
+      try { ev && ev.preventDefault && ev.preventDefault(); } catch(_){}
+      try { ev && ev.stopPropagation && ev.stopPropagation(); } catch(_){}
+      try {
+        if (typeof toast === 'function') {
+          toast('🎯 PRO モードは準備中です (Coming Soon)', false, 2800);
+        } else {
+          alert('🎯 PRO モードは準備中です (Coming Soon)');
+        }
+      } catch(_) { alert('🎯 PRO モードは準備中です (Coming Soon)'); }
+      return false;
     });
+    /* v85.3.6 : PRO 内ボタンは到達しないが念のため無効化 (paneInputPro は表示されない)
+       — 元の各 _safeBind は残しても発火しないが、PRO起動経路は塞いだのでOK */
     // v85.3.0 : PRO 内の「閉じる」ボタン -> 組表示へ
     _safeBind('#iproBtnClose', 'click', function(){
       activatePane('board');
@@ -6458,6 +6600,254 @@ _bindSafe('orientation',     bindOrientation);
 })();
 
 </script>
+<script>
+(function(){
+
+  /* ============================================================
+   * v85.3.6 : 情報交換エリア — 3ボタンの処理
+   *  ① 📷 写真UP : カメラ/ギャラリーから写真選択 →
+   *                Canvas で写真+スコアカードを1枚に合成 →
+   *                Web Share API (Level 2) で OS共有シート起動
+   *                → LINE / Instagram / X / TikTok 等が並ぶ
+   *  ② 📋 スコアコピー : 整形済みテキストをクリップボードへ
+   *  ③ 💬 LINE 直接起動 : line:// カスタムURLスキームで起動
+   * ============================================================ */
+  function v85_3_6_buildScoreText(){
+    try {
+      var s = (Store && Store.get) ? Store.get() : {};
+      var r = s && s.round ? s.round : {};
+      var holes = (r && r.holes) || [];
+      var name  = (s && (s.familyName || s.nickname)) || 'プレイヤー';
+      var outSum = 0, inSum = 0, total = 0;
+      var lines = ['🏌️ G-WORLD スコア (' + name + ')'];
+      for (var i=1; i<=18; i++){
+        var h = holes[i-1] || {};
+        var sc = (h.score!=null) ? h.score : '-';
+        var par = (h.par!=null) ? h.par : (window.HOLE_PAR_MAP && window.HOLE_PAR_MAP[i]) || 4;
+        if (typeof sc === 'number'){
+          if (i<=9) outSum += sc; else inSum += sc;
+          total += sc;
+        }
+        lines.push('H' + i + ': ' + sc + ' (Par' + par + ')');
+        if (i===9) lines.push('--- OUT: ' + (outSum||'-') + ' ---');
+      }
+      lines.push('--- IN : ' + (inSum||'-') + ' ---');
+      lines.push('=== TOTAL: ' + (total||'-') + ' ===');
+      lines.push('');
+      lines.push('#GWORLD #ゴルフスコア');
+      return lines.join('\n');
+    } catch(e){
+      console.warn('[v85.3.6] buildScoreText err', e);
+      return '🏌️ G-WORLD スコア';
+    }
+  }
+  function v85_3_6_drawScoreCanvas(photoImg, cb){
+    /* 写真 + スコアカード を 1枚のPNGに合成 */
+    try {
+      var W = 1080;
+      var photoH = photoImg ? Math.round(W * (photoImg.naturalHeight / photoImg.naturalWidth)) : 0;
+      if (photoH > 1200) photoH = 1200;
+      var scoreH = 720;
+      var H = photoH + scoreH;
+      var cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      var ctx = cv.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,W,H);
+      /* 写真 */
+      if (photoImg){
+        ctx.drawImage(photoImg, 0, 0, W, photoH);
+      }
+      /* スコアカード描画開始 */
+      var y = photoH;
+      ctx.fillStyle = '#2b8a4c';
+      ctx.fillRect(0, y, W, 70);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 36px sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🏌️ G-WORLD スコア', 24, y + 35);
+      y += 70;
+      /* スコア行 */
+      var s = (Store && Store.get) ? Store.get() : {};
+      var r = s && s.round ? s.round : {};
+      var holes = (r && r.holes) || [];
+      var name = (s && (s.familyName || s.nickname)) || 'プレイヤー';
+      ctx.fillStyle = '#234';
+      ctx.font = 'bold 30px sans-serif';
+      ctx.fillText(name + ' さん', 24, y + 24);
+      y += 50;
+      /* 表ヘッダ */
+      var cellW = (W - 48) / 10;
+      function drawRow(yy, vals, isHead){
+        for (var i=0; i<vals.length; i++){
+          var x = 24 + i * cellW;
+          ctx.strokeStyle = '#cfd9e2';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x, yy, cellW, 44);
+          if (isHead){ ctx.fillStyle = '#eaf0f5'; ctx.fillRect(x+1, yy+1, cellW-2, 42); }
+          ctx.fillStyle = isHead ? '#36506e' : '#234';
+          ctx.font = (isHead ? 'bold ' : '') + '22px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(vals[i] != null ? vals[i] : '-'), x + cellW/2, yy + 22);
+        }
+      }
+      /* OUT */
+      var headOut = ['H','1','2','3','4','5','6','7','8','9','OUT'].slice(0,10);
+      var outScores = ['SC']; var outSum = 0;
+      for (var i=1; i<=9; i++){
+        var sc = (holes[i-1] && holes[i-1].score != null) ? holes[i-1].score : '-';
+        outScores.push(sc);
+        if (typeof sc === 'number') outSum += sc;
+      }
+      drawRow(y, headOut, true); y += 44;
+      drawRow(y, outScores, false); y += 44;
+      ctx.fillStyle = '#234'; ctx.font='bold 22px sans-serif'; ctx.textAlign='left';
+      ctx.fillText('OUT 計: ' + (outSum||'-'), 24, y + 16); y += 40;
+      /* IN */
+      var headIn = ['H','10','11','12','13','14','15','16','17','18','IN'].slice(0,10);
+      var inScores = ['SC']; var inSum = 0;
+      for (var j=10; j<=18; j++){
+        var sc2 = (holes[j-1] && holes[j-1].score != null) ? holes[j-1].score : '-';
+        inScores.push(sc2);
+        if (typeof sc2 === 'number') inSum += sc2;
+      }
+      drawRow(y, headIn, true); y += 44;
+      drawRow(y, inScores, false); y += 44;
+      ctx.fillStyle = '#234'; ctx.font='bold 22px sans-serif'; ctx.textAlign='left';
+      ctx.fillText('IN  計: ' + (inSum||'-') + '   TOTAL: ' + ((outSum+inSum)||'-'), 24, y + 16);
+      /* 完成 */
+      cv.toBlob(function(blob){ cb(blob); }, 'image/png');
+    } catch(e){
+      console.warn('[v85.3.6] drawScoreCanvas err', e);
+      cb(null);
+    }
+  }
+  function v85_3_6_pickPhotoAndShare(){
+    /* <input type="file" capture> を動的生成して写真選択 */
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.setAttribute('capture','environment');
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    input.addEventListener('change', function(){
+      var f = input.files && input.files[0];
+      document.body.removeChild(input);
+      if (!f){
+        /* 写真選択キャンセル → スコアのみ画像を生成して共有 */
+        v85_3_6_drawScoreCanvas(null, function(blob){
+          v85_3_6_shareBlob(blob);
+        });
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(ev){
+        var img = new Image();
+        img.onload = function(){
+          v85_3_6_drawScoreCanvas(img, function(blob){
+            v85_3_6_shareBlob(blob);
+          });
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(f);
+    });
+    input.click();
+  }
+  function v85_3_6_shareBlob(blob){
+    if (!blob){
+      try { toast && toast('画像生成に失敗しました', true); } catch(_){}
+      return;
+    }
+    try {
+      var file = new File([blob], 'gworld-score.png', { type:'image/png' });
+      if (navigator.canShare && navigator.canShare({ files:[file] }) && navigator.share){
+        navigator.share({
+          files: [file],
+          title: 'G-WORLD スコア',
+          text:  v85_3_6_buildScoreText()
+        }).catch(function(err){
+          if (err && err.name !== 'AbortError'){
+            console.warn('[v85.3.6] share err', err);
+            v85_3_6_fallbackDownload(blob);
+          }
+        });
+      } else {
+        /* Web Share API 非対応 → ダウンロード */
+        v85_3_6_fallbackDownload(blob);
+      }
+    } catch(e){
+      console.warn('[v85.3.6] shareBlob err', e);
+      v85_3_6_fallbackDownload(blob);
+    }
+  }
+  function v85_3_6_fallbackDownload(blob){
+    try {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'gworld-score.png';
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 1500);
+      try { toast && toast('共有非対応のためダウンロードしました', false, 3000); } catch(_){}
+    } catch(e){ console.warn(e); }
+  }
+  function v85_3_6_copyScore(){
+    var txt = v85_3_6_buildScoreText();
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).then(function(){
+          try { toast && toast('📋 スコアをコピーしました', false, 2500); } catch(_){}
+        }, function(err){
+          v85_3_6_copyFallback(txt);
+        });
+      } else {
+        v85_3_6_copyFallback(txt);
+      }
+    } catch(e){ v85_3_6_copyFallback(txt); }
+  }
+  function v85_3_6_copyFallback(txt){
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = txt; ta.style.position='fixed'; ta.style.left='-9999px';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      try { toast && toast('📋 コピー完了', false, 2500); } catch(_){}
+    } catch(e){
+      try { toast && toast('コピーに失敗しました', true); } catch(_){}
+    }
+  }
+  function v85_3_6_openLine(){
+    var msg = v85_3_6_buildScoreText();
+    var url = 'https://line.me/R/share?text=' + encodeURIComponent(msg);
+    try { window.location.href = url; } catch(e){ window.open(url, '_blank'); }
+  }
+  function v85_3_6_bindInfoButtons(){
+    var btnP = document.getElementById('infoBtnPhoto');
+    var btnC = document.getElementById('infoBtnCopy');
+    var btnL = document.getElementById('infoBtnLine');
+    if (btnP) btnP.addEventListener('click', v85_3_6_pickPhotoAndShare);
+    if (btnC) btnC.addEventListener('click', v85_3_6_copyScore);
+    if (btnL) btnL.addEventListener('click', v85_3_6_openLine);
+    /* 告知欄: 起動時刻を入れておく */
+    var t = document.getElementById('infoNoticeTime');
+    if (t){
+      var d = new Date();
+      t.textContent = ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+    }
+  }
+  try {
+    if (document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', v85_3_6_bindInfoButtons);
+    } else {
+      v85_3_6_bindInfoButtons();
+    }
+  } catch(e){ console.warn('[v85.3.6] bind err', e); }
+
+})();
+</script>
+
 
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>

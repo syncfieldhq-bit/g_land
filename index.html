@@ -1261,7 +1261,8 @@ body.scr-register .bottom-nav{ display:none; }
 .mode-pane.is-active{ display:block; }
 
 /* ============================================================
- * v85.3.1 PWA-FIX : ステータスバーぶんの上余白を全画面で確保
+ * v85.3.2 PWA-FIX : ステータスバーぶんの上余白を全画面で確保
+ *  + PRO ツールバーは padding-top: max(env, 12px) で確実に底上げ
  * ============================================================ */
 :root { --gw-safe-top: env(safe-area-inset-top, 0px); }
 #screen-card .card-dash{
@@ -1307,7 +1308,7 @@ button, .dash-cell, .card-side-close, .card-side-qr,
   align-items:center;
   gap: 4px;
   padding: 0 6px;
-  padding-top: max(0px, env(safe-area-inset-top));
+  padding-top: max(env(safe-area-inset-top), 12px); /* v85.3.2: PWAでステータスバー貫通防止 */
   overflow-x:auto;
   overflow-y:hidden;
   scrollbar-width: none;
@@ -2599,7 +2600,7 @@ button, .dash-cell, .card-side-close, .card-side-qr,
      *   ⑤ クライアント保存バージョンとの差分を判定 (state.html へバトンタッチ)
      * ============================================================ */
     window.GW_BOOT = {
-      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.1",
+      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.2",
       versionCode   : 85000,
       buildAt       : new Date().toISOString(),
       course        : "Rokko Kokusai Public",
@@ -2607,7 +2608,7 @@ button, .dash-cell, .card-side-close, .card-side-qr,
       urlVersion    : "",
       webAppUrl     : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.GAS_WEB_APP_URL) || "",
       cacheBuster   : "v85",
-      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.1"
+      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.2"
     };
     (function(){
       try {
@@ -5018,7 +5019,10 @@ _bindSafe('orientation',     bindOrientation);
       var rnd = s.round || {};
       var self = s.self || s.user || {};
       // v85.3.1 : 「自分 佐藤」用の表示名 (familyName 優先, fallback: nickname)
-      var displayName = self.familyName || self.lastName || self.nickname || '';
+      /* v85.3.2: displayName キー揺れ対策 (家族姓>名前>表示名>ニック>ユーザー名) */
+      var displayName = self.familyName || self.lastName || self.name ||
+                        self.displayName || self.dispName || self.nickname ||
+                        self.userName || self.firstName || '';
       var holes = rnd.holes || 18;
 
       // ツールバー値を既存のdashから同期
@@ -5040,14 +5044,25 @@ _bindSafe('orientation',     bindOrientation);
       var selfNameEl = document.getElementById('iproSelfName');
       if (selfNameEl) selfNameEl.textContent = displayName ? ('自分 ' + displayName) : '自分';
 
-      // 「次の未入力ホール」を推定
+      // v85.3.2: ホール決定ロジック
+      //   優先順位 1) IPRO_STATE.forceHoleNo (確定/前H押下時の希望ホール)
+      //   優先順位 2) IPRO_STATE.holeNo の継続 (画面上の現在H)
+      //   優先順位 3) 次の未入力ホール推定 (初回起動時のみ)
       var myScores = iproGetPlayerScores(self, rnd);
-      var nextHole = 1;
-      for (var i = 1; i <= holes; i++) {
-        var v = myScores[i] || (myScores['h' + i]);
-        var sv = (v && (v.score != null)) ? v.score : v;
-        if (sv == null || sv === '' || sv === 0) { nextHole = i; break; }
-        if (i === holes) nextHole = holes;
+      var nextHole;
+      if (IPRO_STATE.forceHoleNo != null) {
+        nextHole = Math.max(1, Math.min(holes, Number(IPRO_STATE.forceHoleNo)));
+        IPRO_STATE.forceHoleNo = null; /* 一度きり */
+      } else if (IPRO_STATE.holeNo && IPRO_STATE.holeNo >= 1 && IPRO_STATE.holeNo <= holes) {
+        nextHole = IPRO_STATE.holeNo;
+      } else {
+        nextHole = 1;
+        for (var i = 1; i <= holes; i++) {
+          var v = myScores[i] || (myScores['h' + i]);
+          var sv = (v && (v.score != null)) ? v.score : v;
+          if (sv == null || sv === '' || sv === 0) { nextHole = i; break; }
+          if (i === holes) nextHole = holes;
+        }
       }
       IPRO_STATE.holeNo = nextHole;
       // パー設定
@@ -5086,56 +5101,98 @@ _bindSafe('orientation',     bindOrientation);
   }
 
   function renderIproTeam(rnd, self, holes, displayNameOpt){
+    /* v85.3.2: 18H 完全対応・OUT/IN/TOT・キー揺れ対策 */
     var table = document.getElementById('iproTeamTable');
     if (!table) return;
-    var members = (rnd && rnd.members) ? rnd.members.slice() : [];
-    // v85.3.1 : 自分が members に含まれてなければ先頭に追加 (招待してない場合の対策)
-    var selfUid = self && (self.userId || self.uid || self.id);
+    holes = Number(holes) || 18;
+    if (holes !== 9 && holes !== 18) holes = 18;
+
+    /* メンバー配列の構築。自分が boardPlayers/members に居なくても先頭挿入 */
+    var members = [];
+    if (rnd && rnd.boardPlayers && rnd.boardPlayers.length) {
+      members = rnd.boardPlayers.slice();
+    } else if (rnd && rnd.members && rnd.members.length) {
+      members = rnd.members.slice();
+    }
+    var selfUid = self && (self.userId || self.uid || self.id || self.nickname || self.familyName);
     var hasSelf = false;
     for (var mi = 0; mi < members.length; mi++) {
-      var mm = members[mi];
-      if (mm && (mm.userId === selfUid || mm.uid === selfUid || mm.id === selfUid)) { hasSelf = true; break; }
+      var mm = members[mi] || {};
+      var muid = mm.userId || mm.uid || mm.id || mm.nickname || mm.familyName;
+      if (muid && muid === selfUid) { hasSelf = true; members[mi]._isSelf = true; break; }
     }
     if (!hasSelf && self) {
       members.unshift({
-        userId:     selfUid,
-        nickname:   self.nickname,
-        familyName: self.familyName || self.lastName,
-        firstName:  self.firstName,
-        _isSelf:    true
+        userId:      selfUid,
+        nickname:    self.nickname,
+        familyName:  self.familyName || self.lastName,
+        firstName:   self.firstName,
+        name:        self.name,
+        displayName: self.displayName || self.dispName,
+        _isSelf:     true
       });
     }
     if (!members.length) members = [{ familyName:'自分', _isSelf:true }];
 
-    var firstHalf = Math.min(9, holes);
+    /* ===== ヘッダ ===== */
     var head = '<tr><th class="tm-name">名前</th>';
-    for (var h = 1; h <= firstHalf; h++) head += '<th>' + h + '</th>';
-    if (holes > 9) head += '<th>OUT</th>';
+    /* 前半 1〜min(9,holes) */
+    var firstEnd = Math.min(9, holes);
+    for (var h = 1; h <= firstEnd; h++) head += '<th>' + h + '</th>';
+    if (holes >= 9) head += '<th class="tm-total">OUT</th>';
+    /* 後半 10〜18 (18H時のみ) */
+    if (holes > 9) {
+      for (var h2 = 10; h2 <= holes; h2++) head += '<th>' + h2 + '</th>';
+      head += '<th class="tm-total">IN</th>';
+    }
     head += '<th class="tm-total">TOT</th></tr>';
 
+    /* ===== 本体 ===== */
     var body = '';
     members.forEach(function(m){
-      // v85.3.1 : 名前は familyName 優先 (「佐藤」「坪井」のように表示)
-      var name = m.familyName || m.lastName || m.nickname || '―';
-      var isSelf = !!m._isSelf || (self && ((m.userId && m.userId === selfUid) || (m.uid && m.uid === selfUid)));
+      m = m || {};
+      /* v85.3.2 : 名前はキー揺れ対策・多段フォールバック */
+      var rawName = m.familyName || m.lastName || m.name ||
+                    m.displayName || m.dispName || m.nickname ||
+                    m.userName || m.firstName || '―';
+      var name = (rawName && rawName.length > 6) ? rawName.slice(0,6) : rawName;
+      var isSelf = !!m._isSelf || (selfUid && (
+                     m.userId === selfUid || m.uid === selfUid ||
+                     m.id === selfUid || m.nickname === selfUid ||
+                     m.familyName === selfUid));
       var rowCls = isSelf ? ' class="is-self"' : '';
-      body += '<tr' + rowCls + '><td class="tm-name">' + (name.length > 6 ? name.slice(0,6) : name) + '</td>';
+      body += '<tr' + rowCls + '><td class="tm-name">' + name + '</td>';
+
       var scores = iproGetPlayerScores(m, rnd);
-      var sum = 0, out = 0, hasAny = false;
-      for (var h = 1; h <= firstHalf; h++) {
+      var out = 0, hasOut = false;
+      var inSum = 0, hasIn = false;
+
+      /* 前半 td */
+      for (var h = 1; h <= firstEnd; h++) {
         var v = scores[h] || scores['h' + h] || {};
         var s = (v.score != null) ? Number(v.score) : null;
-        if (s != null && !isNaN(s)) { sum += s; out += s; hasAny = true; }
+        if (s != null && !isNaN(s)) { out += s; hasOut = true; }
         body += '<td>' + (s != null && !isNaN(s) ? s : '') + '</td>';
       }
-      if (holes > 9) body += '<td class="tm-total">' + (hasAny ? out : '') + '</td>';
-      for (var h2 = 10; h2 <= holes; h2++) {
-        var v2 = scores[h2] || scores['h' + h2] || {};
-        var s2 = (v2.score != null) ? Number(v2.score) : null;
-        if (s2 != null && !isNaN(s2)) sum += s2;
+      if (holes >= 9) body += '<td class="tm-total">' + (hasOut ? out : '') + '</td>';
+
+      /* 後半 td (18H時のみ) */
+      if (holes > 9) {
+        for (var h3 = 10; h3 <= holes; h3++) {
+          var v3 = scores[h3] || scores['h' + h3] || {};
+          var s3 = (v3.score != null) ? Number(v3.score) : null;
+          if (s3 != null && !isNaN(s3)) { inSum += s3; hasIn = true; }
+          body += '<td>' + (s3 != null && !isNaN(s3) ? s3 : '') + '</td>';
+        }
+        body += '<td class="tm-total">' + (hasIn ? inSum : '') + '</td>';
       }
-      body += '<td class="tm-total">' + (hasAny ? sum : '') + '</td></tr>';
+
+      /* TOT */
+      var totHas = hasOut || hasIn;
+      var totVal = (hasOut ? out : 0) + (hasIn ? inSum : 0);
+      body += '<td class="tm-total">' + (totHas ? totVal : '') + '</td></tr>';
     });
+
     var thead = table.querySelector('thead');
     var tbody = table.querySelector('tbody');
     if (thead) thead.innerHTML = head;
@@ -5163,7 +5220,11 @@ _bindSafe('orientation',     bindOrientation);
     _safeBind('#iproPuttDown', 'click', function(){ step('putt',  -1); });
     _safeBind('#iproPuttUp',   'click', function(){ step('putt',   1); });
     _safeBind('#iproSkipBtn',  'click', function(){
-      if (IPRO_STATE.holeNo > 1) IPRO_STATE.holeNo--;
+      /* v85.3.2: 前H ボタンも forceHoleNo 経由 */
+      if (IPRO_STATE.holeNo > 1) {
+        IPRO_STATE.forceHoleNo = IPRO_STATE.holeNo - 1;
+        IPRO_STATE.holeNo      = IPRO_STATE.holeNo - 1;
+      }
       try { renderInputPro(); } catch(_){ }
     });
     _safeBind('#iproCommitBtn','click', function(){
@@ -5214,9 +5275,15 @@ _bindSafe('orientation',     bindOrientation);
 
         if (typeof toast === 'function') toast(holeNo + 'H 確定: ' + finalScore);
 
-        // 次のホールへ進む
+        // v85.3.2: 次のホールへ進む (forceHoleNo で renderInputPro に伝達)
         var holes = (s.round && s.round.holes) || 18;
-        if (holeNo < holes) IPRO_STATE.holeNo = holeNo + 1;
+        if (holeNo < holes) {
+          IPRO_STATE.forceHoleNo = holeNo + 1;
+          IPRO_STATE.holeNo      = holeNo + 1;
+        } else {
+          IPRO_STATE.forceHoleNo = holes;
+          IPRO_STATE.holeNo      = holes;
+        }
         IPRO_STATE.score = null;
         IPRO_STATE.putt  = null;
         IPRO_STATE.dirty = false;

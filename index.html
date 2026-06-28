@@ -2750,7 +2750,7 @@ body.is-score-pad-open .info-zone{ display:none !important; }
      *   ⑤ クライアント保存バージョンとの差分を判定 (state.html へバトンタッチ)
      * ============================================================ */
     window.GW_BOOT = {
-      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.6",
+      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.6.1",
       versionCode   : 85000,
       buildAt       : new Date().toISOString(),
       course        : "Rokko Kokusai Public",
@@ -2758,7 +2758,7 @@ body.is-score-pad-open .info-zone{ display:none !important; }
       urlVersion    : "",
       webAppUrl     : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.GAS_WEB_APP_URL) || "",
       cacheBuster   : "v85",
-      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.6"
+      serverVersion : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.6.1"
     };
     (function(){
       try {
@@ -4992,6 +4992,47 @@ _bindSafe('orientation',     bindOrientation);
       _boardSetStatus_(_formatTimeHM_(r.lastAggregatedAt));
     });
   }
+
+  /* ==========================================================
+   * v85.3.6.1 : 組表示モード スコア表示モード対応 ヘルパー
+   *   - formatCell (private scope) と同等の処理を組表示用に提供
+   *   - number = ストローク (素の数字)
+   *   - diff   = ±記号 (E, +1, -2)
+   *   - symbol = ◯△□ (バーディ/パー/ボギー)
+   * ========================================================== */
+  function _v86FormatBoardCell(v, par, mode){
+    if (v == null || isNaN(v)) return '―';
+    if (mode === 'symbol'){
+      try {
+        if (typeof window.getDiffSymbol === 'function'){
+          var sym = window.getDiffSymbol(v, par);
+          return sym || String(v);
+        }
+      } catch(_){}
+      return String(v);
+    }
+    if (mode === 'diff'){
+      var d = v - par;
+      if (d === 0) return 'E';
+      if (d  >  0) return '<span class="diff-pos">+' + d + '</span>';
+      return '<span class="diff-neg">' + d + '</span>';
+    }
+    return String(v); /* number モード */
+  }
+  /* v85.3.6.1 : scoreMode 変更時に組表示を自動再描画 */
+  try {
+    if (typeof Store !== 'undefined' && Store.subscribe){
+      Store.subscribe(function(s){
+        try {
+          var pane = document.getElementById('paneBoard');
+          if (pane && pane.classList.contains('is-active')){
+            if (typeof renderBoard === 'function') renderBoard();
+          }
+        } catch(_){}
+      }, ['scoreMode']);
+    }
+  } catch(_){}
+
   function _renderBoardTable_(tableEl, data){
     /* v71.3 Phase 4-d : OUT/IN/TOTAL 列を追加 + 9H モード対応 */
     var holeCount = 18;
@@ -5052,12 +5093,17 @@ _bindSafe('orientation',     bindOrientation);
                   (isMe ? ' <span class="bt-badge-me">自分</span>' : '') + '</td>';
       /* OUT : 1H-9H */
       var outSum = 0, outHas = false;
+      /* v85.3.6.1 : scoreMode (number/diff/symbol) に応じて表示変換 */
+      var _v86Mode = (s && s.scoreMode) || 'number';
       for (var h = 1; h <= 9; h++) {
         var sc = (scoreMap[p.userId] || {})[h];
         if (sc && sc.stroke != null && sc.stroke !== '') {
           var v = Number(sc.stroke);
           if (!isNaN(v)) { outSum += v; outHas = true; }
-          bodyHtml += '<td class="bt-cell bt-filled">' + sc.stroke + '</td>';
+          var _v86Par = (window.HOLE_PAR_MAP && window.HOLE_PAR_MAP[h] != null)
+                        ? Number(window.HOLE_PAR_MAP[h]) : 4;
+          var _v86Html = _v86FormatBoardCell(v, _v86Par, _v86Mode);
+          bodyHtml += '<td class="bt-cell bt-filled">' + _v86Html + '</td>';
         } else {
           bodyHtml += '<td class="bt-cell bt-empty">―</td>';
         }
@@ -5071,7 +5117,11 @@ _bindSafe('orientation',     bindOrientation);
           if (sc2 && sc2.stroke != null && sc2.stroke !== '') {
             var v2 = Number(sc2.stroke);
             if (!isNaN(v2)) { inSum += v2; inHas = true; }
-            bodyHtml += '<td class="bt-cell bt-filled">' + sc2.stroke + '</td>';
+            /* v85.3.6.1 : scoreMode 対応 */
+            var _v86Par2 = (window.HOLE_PAR_MAP && window.HOLE_PAR_MAP[h2] != null)
+                           ? Number(window.HOLE_PAR_MAP[h2]) : 4;
+            var _v86Html2 = _v86FormatBoardCell(v2, _v86Par2, _v86Mode);
+            bodyHtml += '<td class="bt-cell bt-filled">' + _v86Html2 + '</td>';
           } else {
             bodyHtml += '<td class="bt-cell bt-empty">―</td>';
           }

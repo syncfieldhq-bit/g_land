@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#2d9d5f">
-  <meta name="description" content="G-WORLD v85 - ゴルフスコア管理 (v85.3.5 UI × v80 通信)">
+  <meta name="description" content="G-WORLD v85 - ゴルフスコア管理 (v72.2.1 UI × v80 通信)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="G-WORLD">
@@ -146,7 +146,14 @@ a{ color:var(--c-green-dark); text-decoration:none; }
 body.scr-register .screen#screen-register{ display:block; padding:0; }
 body.scr-home     .screen#screen-home    { display:block; }
 body.scr-prep     .screen#screen-prep    { display:block; }
-body.scr-card .screen#screen-card{ display:flex; flex-direction:column; padding-top:calc(env(safe-area-inset-top) + 0px); padding-bottom:calc(var(--nav-h) + var(--safe-bottom) + 0px); }
+body.scr-card     .screen#screen-card    { display:flex; flex-direction:column; padding-bottom:0; padding-top:calc(env(safe-area-inset-top) + 96px); /* v85.3.4-hotfix: プロ画面のツールバーをヘッダ下に押し下げる */ }
+
+/* v85.3.4-hotfix : PRO 起動中は画面最上端から直接 toolbar を始めないよう、
+   上に必ず safe-area + 96px ぶんの領域を確保する */
+body.scr-input-pro #screen-card,
+body.scr-input-pro{
+  padding-top:calc(env(safe-area-inset-top) + 96px) !important;
+}
 body.scr-compete  .screen#screen-compete { display:block; }
 body.scr-mypage   .screen#screen-mypage  { display:block; }
 body.scr-register .bottom-nav{ display:none; }
@@ -364,7 +371,7 @@ body.scr-register .bottom-nav{ display:none; }
 }
 .card-dash{
   background:#fff;
-  padding:4px 12px;
+  padding:10px 12px;
   border-bottom:1px solid var(--c-line);
   flex-shrink:0;                                    /* ★ ヘッダーは縮まない */
 }
@@ -1079,9 +1086,6 @@ body.scr-register .bottom-nav{ display:none; }
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   will-change: scroll-position;
-  flex: 1 1 auto;        /* 中味が増えても縮める */
-  min-height: 0;          /* flex 子の高さ詰まり回避 */
-  overflow-y: auto;       /* 溢れたら縦スクロール */
 }
 
 /* 入力パネル : 開閉アニメ用のレイヤ予告
@@ -1270,10 +1274,10 @@ body.scr-register .bottom-nav{ display:none; }
  * ============================================================ */
 :root { --gw-safe-top: env(safe-area-inset-top, 0px); }
 #screen-card .card-dash{
-  padding-top: 0px;
+  padding-top: max(8px, env(safe-area-inset-top));
 }
 #screen-card .card-modeswitch{
-  padding-top: 0px;
+  padding-top: 4px;
 }
 
 /* v85.3.1 : Safari 連打ズーム抑制 (アクセシビリティ温存) */
@@ -2079,7 +2083,7 @@ body.is-score-pad-open .info-zone{ display:none !important; }
     <header class="page-head">
       <div class="ph-greet">こんにちは 👋</div>
       <div class="ph-name"><span id="homeUserName">ゲスト</span> さん</div>
-      <div class="ph-sub">六甲国際パブリックコース 配布版 <span id="gwVersionLabel">v85.3.5</span></div>
+      <div class="ph-sub">六甲国際パブリックコース 配布版 <span id="gwVersionLabel">v72.2.1</span></div>
     </header>
     <main class="page-body">
       <h3 class="sect-ttl">● 利用可能な機能</h3>
@@ -6006,17 +6010,11 @@ _bindSafe('orientation',     bindOrientation);
       frag.appendChild(row);
     });
     wrap.replaceChildren(frag);
-   if (window.GW_BOOT) {
-  const fq = document.getElementById('freeQR');
-  if (fq) {
-    /* ★ 配布QR は GitHub Pages の URL を優先 */
-    const distUrl = (window.GWORLD_CONFIG && window.GWORLD_CONFIG.DISTRIBUTION_URL)
-                  || GW_BOOT.webAppUrl
-                  || location.href.split('#')[0];
-    GWQR.render(fq, distUrl, 90);
+    if (window.GW_BOOT && GW_BOOT.webAppUrl) {
+      const fq = document.getElementById('freeQR');
+      if (fq) GWQR.render(fq, GW_BOOT.webAppUrl, 90);
+    }
   }
-}
-
 
   /* ============================================================
    *  v71.3 Phase 4-e : 後半スタート 4-フェーズ表示

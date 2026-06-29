@@ -6006,11 +6006,17 @@ _bindSafe('orientation',     bindOrientation);
       frag.appendChild(row);
     });
     wrap.replaceChildren(frag);
-    if (window.GW_BOOT && GW_BOOT.webAppUrl) {
-      const fq = document.getElementById('freeQR');
-      if (fq) GWQR.render(fq, GW_BOOT.webAppUrl, 90);
-    }
+   if (window.GW_BOOT) {
+  const fq = document.getElementById('freeQR');
+  if (fq) {
+    /* ★ 配布QR は GitHub Pages の URL を優先 */
+    const distUrl = (window.GWORLD_CONFIG && window.GWORLD_CONFIG.DISTRIBUTION_URL)
+                  || GW_BOOT.webAppUrl
+                  || location.href.split('#')[0];
+    GWQR.render(fq, distUrl, 90);
   }
+}
+
 
   /* ============================================================
    *  v71.3 Phase 4-e : 後半スタート 4-フェーズ表示

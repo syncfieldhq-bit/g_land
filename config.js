@@ -14,7 +14,7 @@
 
 window.GWORLD_CONFIG = {
   // ⚠️ デプロイ後に実際のURLに置き換えてください
-  GAS_WEB_APP_URL: "https://syncfieldhq-bit.github.io/g_land/",
+  GAS_WEB_APP_URL: "https://script.google.com/macros/s/AKfycbyo7jv8z9ny8ic8KvQlxFiG90ApfWmz3vQrJkLZHFTM3YYHJIJ9paxfVWvy4Jh81RxmaQ/exec",
 
   // バージョン情報
   APP_VERSION: "v85.1.0",

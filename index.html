@@ -6896,5 +6896,1007 @@ _bindSafe('orientation',     bindOrientation);
 
 
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<!--
+═══════════════════════════════════════════════════════════════════
+ ラウンド履歴保存機能 (v85.4.0)
+ ─ G-LAND ラウンド履歴パッチ ─
+═══════════════════════════════════════════════════════════════════
+ 設計：
+   ・拡張可能な RoundStorage（後でクラウド同期追加可能）
+   ・9H/18H 設定に応じた終了ボタン出現
+   ・ボトムシート保存ダイアログ
+   ・スコア丸スタイルの履歴専用画面
+   ・並び替え・コース別・期間別フィルタ
+   ・LINE/SNS共有
+═══════════════════════════════════════════════════════════════════
+
+▼ 設置先（INDEX.HTMLの ★ 箇所に挿入）
+  ① <style>セクションの末尾 → CSS追加
+  ② </body>直前 → HTMLとスクリプト追加
+  ③ 既存の "ホームカード" 部分 → 履歴ボタン追加
+  ④ 既存の "ラウンド履歴" 表示エリア → 関数連動
+
+詳細は手順書を参照
+═══════════════════════════════════════════════════════════════════
+-->
+
+<!-- =================================================================
+     【PATCH-A】CSS追加（<style>セクションの末尾に追加）
+     ================================================================= -->
+
+<style id="round-history-styles">
+/* ───── ラウンド終了ボタン ───── */
+.rh-finish-btn{
+  display:block; width:calc(100% - 24px); margin:12px auto 4px;
+  padding:14px 16px; border:none; border-radius:14px;
+  background:linear-gradient(180deg,#e74c3c 0%,#c0392b 100%);
+  color:#fff; font-size:16px; font-weight:700;
+  box-shadow:0 4px 12px rgba(192,57,43,.3);
+  cursor:pointer; -webkit-tap-highlight-color:transparent;
+  transition:transform .1s;
+}
+.rh-finish-btn:active{ transform:translateY(2px); box-shadow:0 2px 6px rgba(192,57,43,.3); }
+.rh-finish-btn[disabled]{ opacity:.45; cursor:not-allowed; filter:grayscale(.5); }
+.rh-finish-btn .rh-fb-ico{ margin-right:6px; }
+
+/* ───── ボトムシート（保存確認） ───── */
+.rh-sheet-mask{
+  position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9000;
+  display:none; opacity:0; transition:opacity .2s;
+}
+.rh-sheet-mask.show{ display:block; opacity:1; }
+
+.rh-sheet{
+  position:fixed; left:0; right:0; bottom:0; z-index:9001;
+  background:#fff; border-radius:20px 20px 0 0;
+  padding:20px 18px calc(20px + env(safe-area-inset-bottom));
+  box-shadow:0 -8px 24px rgba(0,0,0,.15);
+  transform:translateY(100%); transition:transform .25s ease;
+  max-height:90vh; overflow-y:auto;
+}
+.rh-sheet.show{ transform:translateY(0); }
+
+.rh-sheet-handle{
+  width:48px; height:5px; background:#ccc; border-radius:3px;
+  margin:0 auto 16px;
+}
+.rh-sheet-ttl{
+  font-size:18px; font-weight:700; color:#1a2b22;
+  text-align:center; margin:0 0 16px;
+}
+.rh-summary{
+  background:#f7f9fb; border-radius:12px; padding:14px 16px;
+  margin-bottom:18px;
+}
+.rh-summary-row{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:6px 0; font-size:14px;
+}
+.rh-summary-row .rh-sr-lbl{ color:#666; }
+.rh-summary-row .rh-sr-val{ color:#1a2b22; font-weight:600; }
+.rh-summary-row.big{ font-size:18px; padding-top:10px; border-top:1px solid #e4e8ec; margin-top:4px; }
+.rh-summary-row.big .rh-sr-val{ font-size:28px; font-weight:800; color:#2563eb; }
+
+.rh-sheet-actions{
+  display:flex; gap:10px;
+}
+.rh-sheet-btn{
+  flex:1; padding:14px 16px; border:none; border-radius:12px;
+  font-size:15px; font-weight:600; cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.rh-sheet-btn.cancel{
+  background:#e4e8ec; color:#555;
+}
+.rh-sheet-btn.save{
+  background:linear-gradient(180deg,#22c55e 0%,#16a34a 100%);
+  color:#fff;
+  box-shadow:0 3px 8px rgba(22,163,74,.3);
+}
+.rh-sheet-btn:active{ transform:translateY(1px); }
+
+/* ───── 履歴一覧画面 ───── */
+body.scr-history .screen#screen-history{ display:block; }
+#screen-history{
+  background:#f7f9fb;
+  min-height:100vh;
+  padding-bottom:calc(var(--nav-h,68px) + env(safe-area-inset-bottom) + 16px);
+}
+#screen-history .rh-header{
+  background:linear-gradient(180deg,#2563eb 0%,#1d4ed8 100%);
+  color:#fff;
+  padding:calc(env(safe-area-inset-top) + 12px) 16px 14px;
+  position:relative;
+  text-align:center;
+}
+#screen-history .rh-back{
+  position:absolute; left:12px; top:calc(env(safe-area-inset-top) + 12px);
+  background:transparent; border:none; color:#fff;
+  font-size:20px; padding:4px 8px; cursor:pointer;
+}
+#screen-history .rh-h-ttl{ font-size:18px; font-weight:700; margin:0; }
+#screen-history .rh-h-sub{ font-size:11px; opacity:.85; margin-top:2px; }
+
+/* 集計バー */
+.rh-stats{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
+  padding:14px 12px 6px;
+}
+.rh-stat-card{
+  background:#fff; border-radius:10px; padding:10px 8px;
+  text-align:center;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.rh-stat-lbl{ font-size:11px; color:#888; margin-bottom:4px; }
+.rh-stat-val{ font-size:20px; font-weight:800; color:#1a2b22; }
+.rh-stat-val.best{ color:#dc2626; }
+.rh-stat-val.avg{ color:#2563eb; }
+
+/* フィルタ・並び替えバー */
+.rh-filters{
+  display:flex; flex-wrap:wrap; gap:6px;
+  padding:8px 12px;
+  background:#fff;
+  margin:0 12px;
+  border-radius:10px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.rh-filter-group{
+  display:flex; align-items:center; gap:6px;
+  font-size:12px; flex:1; min-width:0;
+}
+.rh-filter-group label{
+  color:#666; font-weight:600; white-space:nowrap;
+}
+.rh-filter-group select{
+  flex:1; min-width:0;
+  padding:6px 8px; border:1px solid #d4d8dc; border-radius:6px;
+  font-size:13px; background:#fff;
+}
+.rh-sort-btns{
+  display:flex; gap:4px; padding:8px 12px;
+}
+.rh-sort-btn{
+  flex:1; padding:8px; border:none; border-radius:8px;
+  background:#e4e8ec; color:#555; font-size:12px; font-weight:600;
+  cursor:pointer;
+}
+.rh-sort-btn.active{ background:#2563eb; color:#fff; }
+
+/* 履歴カードリスト */
+.rh-list{
+  padding:10px 12px;
+}
+.rh-empty{
+  text-align:center; padding:40px 20px;
+  color:#888; font-size:13px;
+}
+.rh-card{
+  display:flex; align-items:stretch; gap:0;
+  background:#fff; border-radius:12px; margin-bottom:10px;
+  box-shadow:0 1px 3px rgba(0,0,0,.08);
+  overflow:hidden;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.rh-card-score{
+  flex:0 0 auto; width:74px;
+  background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);
+  color:#fff; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding:14px 8px;
+}
+.rh-card-score-val{ font-size:30px; font-weight:800; line-height:1; }
+.rh-card-score-diff{ font-size:11px; opacity:.9; margin-top:4px; }
+.rh-card-body{
+  flex:1; padding:14px 14px;
+  display:flex; flex-direction:column; justify-content:center;
+  min-width:0;
+}
+.rh-card-date{
+  font-size:13px; color:#666; margin-bottom:4px;
+}
+.rh-card-course{
+  font-size:15px; font-weight:600; color:#1a2b22;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.rh-card-meta{
+  font-size:11px; color:#888; margin-top:4px;
+}
+
+/* マイページ内の履歴ミニ表示 */
+.my-history .mh-line{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 0; border-bottom:1px solid #eef1f4;
+  font-size:13px;
+}
+.my-history .mh-line:last-child{ border-bottom:none; }
+.my-history .mh-score{
+  font-weight:700; color:#2563eb; font-size:16px;
+}
+.my-history .mh-info{ flex:1; padding:0 12px; }
+.my-history .mh-date{ font-size:11px; color:#888; }
+.my-history .mh-course{ color:#1a2b22; }
+.my-history .mh-see-all{
+  display:block; width:100%; margin-top:12px;
+  padding:10px; border:1px solid #2563eb; background:#fff;
+  color:#2563eb; border-radius:8px; font-weight:600;
+  font-size:13px; cursor:pointer;
+}
+.my-history .mh-see-all:hover{ background:#eff6ff; }
+
+/* 履歴詳細画面 */
+body.scr-history-detail .screen#screen-history-detail{ display:block; }
+#screen-history-detail{
+  background:#f7f9fb; min-height:100vh;
+  padding-bottom:calc(var(--nav-h,68px) + env(safe-area-inset-bottom) + 16px);
+}
+#screen-history-detail .rh-header{
+  background:linear-gradient(180deg,#2563eb 0%,#1d4ed8 100%);
+  color:#fff;
+  padding:calc(env(safe-area-inset-top) + 12px) 16px 14px;
+  position:relative;
+  text-align:center;
+}
+#screen-history-detail .rh-back{
+  position:absolute; left:12px; top:calc(env(safe-area-inset-top) + 12px);
+  background:transparent; border:none; color:#fff;
+  font-size:20px; padding:4px 8px; cursor:pointer;
+}
+.rhd-hero{
+  background:#fff; padding:16px 16px 14px;
+  margin:0 12px; border-radius:0 0 12px 12px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+  display:flex; align-items:center; gap:14px;
+}
+.rhd-hero-body{ flex:1; min-width:0; }
+.rhd-hero-course{ font-size:16px; font-weight:700; color:#1a2b22;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.rhd-hero-date{ font-size:12px; color:#666; margin-top:3px; }
+.rhd-hero-meta{ font-size:11px; color:#888; margin-top:6px; }
+.rhd-hero-score{ text-align:right; }
+.rhd-hero-score-val{ font-size:32px; font-weight:800; color:#2563eb; line-height:1; }
+.rhd-hero-score-diff{ font-size:11px; color:#666; margin-top:4px; }
+
+.rhd-section{
+  background:#fff; margin:12px;
+  border-radius:12px; padding:14px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.rhd-section h4{
+  margin:0 0 12px; font-size:14px; color:#1a2b22;
+  font-weight:700;
+}
+.rhd-table{
+  width:100%; border-collapse:collapse; font-size:12px;
+}
+.rhd-table th, .rhd-table td{
+  padding:6px 4px; text-align:center;
+  border-bottom:1px solid #eef1f4;
+}
+.rhd-table th{ color:#666; font-weight:600; background:#f7f9fb; }
+.rhd-table td.me{ background:#dbeafe; font-weight:700; }
+.rhd-table th.head-out, .rhd-table th.head-in{
+  background:#2563eb; color:#fff;
+}
+
+.rhd-share-btns{
+  display:flex; gap:8px; padding:0 12px 16px;
+}
+.rhd-share-btn{
+  flex:1; padding:12px; border:none; border-radius:10px;
+  font-size:13px; font-weight:600; cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.rhd-share-btn.line{ background:#06c755; color:#fff; }
+.rhd-share-btn.copy{ background:#e4e8ec; color:#555; }
+.rhd-share-btn.delete{ background:#fee2e2; color:#dc2626; }
+
+/* ホーム画面の履歴ボタン */
+.home-card.history-card{
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+</style>
+
+
+<!-- =================================================================
+     【PATCH-B】HTML追加（</body>直前に追加）
+     ================================================================= -->
+
+<!-- 履歴一覧画面 -->
+<section class="screen" id="screen-history">
+  <header class="rh-header">
+    <button class="rh-back" id="rhBackBtn" aria-label="戻る">←</button>
+    <h2 class="rh-h-ttl">📊 ラウンド履歴</h2>
+    <div class="rh-h-sub">G-LAND スコア記録</div>
+  </header>
+  <div class="rh-stats" id="rhStats">
+    <div class="rh-stat-card">
+      <div class="rh-stat-lbl">ラウンド数</div>
+      <div class="rh-stat-val" id="rhStatCount">0</div>
+    </div>
+    <div class="rh-stat-card">
+      <div class="rh-stat-lbl">ベスト</div>
+      <div class="rh-stat-val best" id="rhStatBest">―</div>
+    </div>
+    <div class="rh-stat-card">
+      <div class="rh-stat-lbl">平均</div>
+      <div class="rh-stat-val avg" id="rhStatAvg">―</div>
+    </div>
+  </div>
+  <div class="rh-filters">
+    <div class="rh-filter-group">
+      <label>コース</label>
+      <select id="rhFilterCourse"><option value="">全コース</option></select>
+    </div>
+    <div class="rh-filter-group">
+      <label>期間</label>
+      <select id="rhFilterPeriod">
+        <option value="">全期間</option>
+        <option value="5">直近5R</option>
+        <option value="10">直近10R</option>
+        <option value="3m">3ヶ月</option>
+        <option value="1y">1年</option>
+      </select>
+    </div>
+  </div>
+  <div class="rh-sort-btns">
+    <button class="rh-sort-btn active" data-sort="date">📅 日付順</button>
+    <button class="rh-sort-btn" data-sort="score">⛳ スコア順</button>
+  </div>
+  <div class="rh-list" id="rhList">
+    <div class="rh-empty">まだラウンド履歴はありません<br>18ホール終了後に保存できます ⛳</div>
+  </div>
+</section>
+
+<!-- 履歴詳細画面 -->
+<section class="screen" id="screen-history-detail">
+  <header class="rh-header">
+    <button class="rh-back" id="rhdBackBtn" aria-label="戻る">←</button>
+    <h2 class="rh-h-ttl" id="rhdTitle">ラウンド詳細</h2>
+    <div class="rh-h-sub" id="rhdSubtitle">―</div>
+  </header>
+  <div class="rhd-hero">
+    <div class="rhd-hero-body">
+      <div class="rhd-hero-course" id="rhdCourse">―</div>
+      <div class="rhd-hero-date" id="rhdDate">―</div>
+      <div class="rhd-hero-meta" id="rhdMeta">―</div>
+    </div>
+    <div class="rhd-hero-score">
+      <div class="rhd-hero-score-val" id="rhdScore">―</div>
+      <div class="rhd-hero-score-diff" id="rhdDiff">―</div>
+    </div>
+  </div>
+  <div class="rhd-section">
+    <h4>📋 スコア表</h4>
+    <div id="rhdTableHolder"></div>
+  </div>
+  <div class="rhd-share-btns">
+    <button class="rhd-share-btn line" id="rhdShareLine">📨 LINEで送る</button>
+    <button class="rhd-share-btn copy" id="rhdShareCopy">📋 コピー</button>
+    <button class="rhd-share-btn delete" id="rhdDelete">🗑 削除</button>
+  </div>
+</section>
+
+<!-- ボトムシート -->
+<div class="rh-sheet-mask" id="rhSheetMask"></div>
+<div class="rh-sheet" id="rhSheet" aria-hidden="true">
+  <div class="rh-sheet-handle"></div>
+  <h3 class="rh-sheet-ttl">🏁 ラウンド終了</h3>
+  <div class="rh-summary">
+    <div class="rh-summary-row"><span class="rh-sr-lbl">コース</span><span class="rh-sr-val" id="rhSumCourse">―</span></div>
+    <div class="rh-summary-row"><span class="rh-sr-lbl">日付</span><span class="rh-sr-val" id="rhSumDate">―</span></div>
+    <div class="rh-summary-row"><span class="rh-sr-lbl">ホール数</span><span class="rh-sr-val" id="rhSumHoles">―</span></div>
+    <div class="rh-summary-row"><span class="rh-sr-lbl">ティー</span><span class="rh-sr-val" id="rhSumTee">―</span></div>
+    <div class="rh-summary-row big"><span class="rh-sr-lbl">スコア</span><span class="rh-sr-val" id="rhSumScore">―</span></div>
+  </div>
+  <div class="rh-sheet-actions">
+    <button class="rh-sheet-btn cancel" id="rhSheetCancel">後で</button>
+    <button class="rh-sheet-btn save" id="rhSheetSave">✅ 履歴に保存</button>
+  </div>
+</div>
+
+
+<!-- =================================================================
+     【PATCH-C】JavaScript追加（</body>直前、<script>タグ内に追加）
+     ================================================================= -->
+
+<script>
+(function(){
+  'use strict';
+
+  /* ───────────────────────────────────────
+     RoundStorage : 拡張可能なデータ層
+     ─ 今夜：localStorage のみ
+     ─ 来週：saveToCloud を実装でクラウド同期
+     ─────────────────────────────────────── */
+  const RoundStorage = {
+    KEY: 'gw_round_history_v1',
+
+    // 全件取得
+    list: function(){
+      try {
+        const raw = localStorage.getItem(this.KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch(e){
+        console.error('[RoundStorage] list parse error', e);
+        return [];
+      }
+    },
+
+    // 保存
+    save: function(round){
+      const list = this.list();
+      round.id = round.id || ('r_' + Date.now() + '_' + Math.random().toString(36).slice(2,7));
+      round.savedAt = round.savedAt || new Date().toISOString();
+      list.unshift(round);
+      try {
+        localStorage.setItem(this.KEY, JSON.stringify(list));
+      } catch(e){
+        console.error('[RoundStorage] save error', e);
+        return null;
+      }
+      // 🔜 来週: this.saveToCloud(round);
+      return round;
+    },
+
+    // ID削除
+    remove: function(id){
+      const list = this.list().filter(function(r){ return r.id !== id; });
+      try {
+        localStorage.setItem(this.KEY, JSON.stringify(list));
+        return true;
+      } catch(e){
+        console.error('[RoundStorage] remove error', e);
+        return false;
+      }
+    },
+
+    // ID取得
+    findById: function(id){
+      const list = this.list();
+      for (let i=0; i<list.length; i++) if (list[i].id === id) return list[i];
+      return null;
+    },
+
+    // 🔜 来週: クラウド同期
+    saveToCloud: function(round){
+      // GAS の WebApp に POST して Google スプレッドシートに保存
+      // 実装は config.js 確認後に来週追加
+    }
+  };
+  window.RoundStorage = RoundStorage;
+
+
+  /* ───────────────────────────────────────
+     CurrentRound : 今のラウンド情報を Store から組み立てる
+     ─────────────────────────────────────── */
+  function collectCurrentRound(){
+    const s = (window.Store && Store.getState && Store.getState()) || {};
+    const COURSE = window.COURSE || {};
+
+    // ホール数（9 or 18）
+    const holesNum = (s.holeMode === 9 || s.holeMode === '9') ? 9 : 18;
+
+    // コース全ホール
+    const courseHoles = (COURSE.holes || []).slice(0, holesNum);
+    const totalPar = courseHoles.reduce(function(a,h){ return a + (Number(h.par)||0); }, 0);
+
+    // プレイヤー情報
+    const players = (s.players || []).map(function(p){
+      const scoreSlot = (s.scores && s.scores[p.name]) || { stroke:[], putt:[] };
+      const myScores = (scoreSlot.stroke || []).slice(0, holesNum).map(function(v){
+        return (v === null || v === undefined || v === '') ? null : Number(v);
+      });
+      const putts = (scoreSlot.putt || []).slice(0, holesNum).map(function(v){
+        return (v === null || v === undefined || v === '') ? null : Number(v);
+      });
+      const filled = myScores.filter(function(v){ return v !== null; });
+      const totalScore = filled.reduce(function(a,b){ return a+b; }, 0);
+      return {
+        name: p.name || p.fullName || 'ゲスト',
+        nickname: p.nickname || '',
+        type: p.type || 'companion',
+        scores: myScores,
+        putts: putts,
+        totalScore: totalScore,
+        filledHoles: filled.length
+      };
+    });
+
+    // 自分のスコア
+    const me = players.filter(function(p){ return p.type === 'me'; })[0] || players[0] || null;
+
+    // 日付（YYYY/M/D）
+    const now = new Date();
+    const dateStr = now.getFullYear() + '/' + (now.getMonth()+1) + '/' + now.getDate();
+
+    return {
+      /* ─── 基本識別子 ─── */
+      id: null,                                          // 保存時に発行（自動）
+      schemaVersion: 1,                                  // データ構造のバージョン（将来移行時に使用）
+
+      /* ─── 日付・時刻 ─── */
+      date: dateStr,                                     // 'YYYY/M/D' 表示用
+      dateRaw: now.toISOString(),                        // ISO 8601（並び替え・フィルタ用）
+      savedAt: null,                                     // 保存時に発行（自動）
+
+      /* ─── コース情報（将来3コース対応のため courseId 準備）─── */
+      course: COURSE.name || '六甲国際パブリックコース',  // コース名（表示用）
+      courseId: COURSE.id || COURSE.courseId || '',      // ★ 将来：QR別ID管理用
+      courseSubId: '',                                   // ★ 将来：東/中/西などサブコース
+      qrCode: (window.GW_BOOT && GW_BOOT.joinId) || '',  // ★ 将来：QR紐付け用
+
+      /* ─── ラウンド構成（将来1.5R・組み合わせ対応の準備）─── */
+      holes: holesNum,                                   // 9 or 18（今夜）
+      halfType: holesNum === 9 ? 'HALF' : 'FULL',        // ★ 将来：'HALF1'/'HALF2'/'FULL'/'1.5R'
+      startSide: s.startSide || (holesNum === 9 ? 'OUT' : 'OUT'), // ★ 将来：'OUT'/'IN'
+      endSide: holesNum === 18 ? 'IN' : 'OUT',           // ★ 将来：終了側
+      sideOrder: holesNum === 18 ? 'OUT→IN' : 'OUT',     // ★ 将来：'OUT→IN'/'IN→OUT'/'東→中'など
+      relatedRoundId: '',                                // ★ 将来：1.5R 時に午前ラウンドとリンク
+
+      /* ─── ティー・PAR ─── */
+      tee: s.tee || s.teeColor || 'REG',                 // ティー（REG/LADIES等）
+      par: totalPar,                                     // PAR合計
+      coursePars: courseHoles.map(function(h){ return Number(h.par)||0; }),
+      courseYards: courseHoles.map(function(h){ return Number(h.yard)||0; }),
+
+      /* ─── スコア ─── */
+      totalScore: (me && me.totalScore) || 0,
+      diff: ((me && me.totalScore) || 0) - totalPar,
+      myScores: (me && me.scores) || [],
+      myPutts: (me && me.putts) || [],
+      players: players,
+      filledHoles: (me && me.filledHoles) || 0,
+
+      /* ─── メタ情報（将来天気・気温追加可能）─── */
+      note: '',
+      weather: '',                                       // ★ 将来：天気API連携
+      tempC: null,                                       // ★ 将来：気温
+
+      /* ─── 同期状態（将来クラウド同期用）─── */
+      cloudSynced: false,                                // ★ 将来：GAS同期済みフラグ
+      cloudSyncedAt: null                                // ★ 将来：クラウド保存日時
+    };
+  }
+
+
+  /* ───────────────────────────────────────
+     終了ボタンの動的制御
+     ─ 9H/18H 設定に応じて全ホール入力済みなら出現
+     ─────────────────────────────────────── */
+  function getFinishSlot(){
+    return document.getElementById('finish-round-slot');
+  }
+  function ensureFinishButton(){
+    const slot = getFinishSlot();
+    if (!slot) return null;
+    let btn = slot.querySelector('.rh-finish-btn');
+    if (!btn){
+      btn = document.createElement('button');
+      btn.className = 'rh-finish-btn';
+      btn.innerHTML = '<span class="rh-fb-ico">🏁</span> ラウンド終了して保存';
+      btn.addEventListener('click', openSheet);
+      slot.appendChild(btn);
+    }
+    return btn;
+  }
+  function updateFinishButton(){
+    const cur = collectCurrentRound();
+    const btn = ensureFinishButton();
+    if (!btn) return;
+    // 全ホール埋まったら active
+    const ready = cur.filledHoles >= cur.holes;
+    btn.disabled = !ready;
+    if (ready){
+      btn.innerHTML = '<span class="rh-fb-ico">🏁</span> ラウンド終了して保存 ('+cur.holes+'H)';
+    } else {
+      btn.innerHTML = '<span class="rh-fb-ico">🏁</span> ラウンド終了 ('+cur.filledHoles+'/'+cur.holes+'H 入力中)';
+    }
+  }
+  // 定期チェック（Store の subscribe を当てたいが、ロバストに setInterval も併用）
+  setInterval(updateFinishButton, 1500);
+  // 初回
+  setTimeout(updateFinishButton, 500);
+
+
+  /* ───────────────────────────────────────
+     ボトムシート（保存確認ダイアログ）
+     ─────────────────────────────────────── */
+  function openSheet(){
+    const cur = collectCurrentRound();
+    document.getElementById('rhSumCourse').textContent = cur.course;
+    document.getElementById('rhSumDate').textContent  = cur.date;
+    document.getElementById('rhSumHoles').textContent = cur.holes + 'H';
+    document.getElementById('rhSumTee').textContent   = cur.tee;
+    const diffStr = cur.diff === 0 ? 'E' : (cur.diff > 0 ? '+' + cur.diff : String(cur.diff));
+    document.getElementById('rhSumScore').textContent = cur.totalScore + ' (' + diffStr + ')';
+
+    document.getElementById('rhSheetMask').classList.add('show');
+    document.getElementById('rhSheet').classList.add('show');
+    // 保存ボタンに current を結びつけ
+    document.getElementById('rhSheetSave').onclick = function(){ saveRound(cur); };
+  }
+  function closeSheet(){
+    document.getElementById('rhSheetMask').classList.remove('show');
+    document.getElementById('rhSheet').classList.remove('show');
+  }
+  document.addEventListener('click', function(e){
+    if (e.target.id === 'rhSheetMask' || e.target.id === 'rhSheetCancel'){
+      closeSheet();
+    }
+  });
+
+  function saveRound(round){
+    const saved = RoundStorage.save(round);
+    closeSheet();
+    if (saved){
+      showToast_('履歴に追加されました ✨');
+      setTimeout(function(){ navigateToHistory(); }, 600);
+    } else {
+      showToast_('保存に失敗しました', true);
+    }
+  }
+
+  function showToast_(msg, isError){
+    if (window.toast){ window.toast(msg, !!isError, 3000); return; }
+    const t = document.getElementById('toast') || document.body;
+    const el = document.createElement('div');
+    el.className = 'toast show' + (isError ? ' err' : '');
+    el.textContent = msg;
+    el.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:'+(isError?'#a03030':'#333')+';color:#fff;padding:12px 20px;border-radius:24px;z-index:10000;';
+    document.body.appendChild(el);
+    setTimeout(function(){ el.remove(); }, 3000);
+  }
+
+
+  /* ───────────────────────────────────────
+     画面遷移（screen-history へ）
+     ─────────────────────────────────────── */
+  function navigateToHistory(){
+    // body class 切り替え
+    document.body.className = (document.body.className || '').split(' ').filter(function(c){
+      return !c.startsWith('scr-');
+    }).join(' ') + ' scr-history';
+    renderHistoryScreen();
+    window.scrollTo(0, 0);
+  }
+  function navigateToHistoryDetail(id){
+    document.body.className = (document.body.className || '').split(' ').filter(function(c){
+      return !c.startsWith('scr-');
+    }).join(' ') + ' scr-history-detail';
+    renderHistoryDetail(id);
+    window.scrollTo(0, 0);
+  }
+  function navigateBack(toMy){
+    document.body.className = (document.body.className || '').split(' ').filter(function(c){
+      return !c.startsWith('scr-');
+    }).join(' ') + (toMy ? ' scr-mypage' : ' scr-home');
+    if (toMy){
+      // myHistory も再描画
+      renderMyHistoryMini();
+    }
+  }
+  document.addEventListener('click', function(e){
+    if (e.target.id === 'rhBackBtn'){
+      navigateBack(true);
+    }
+    if (e.target.id === 'rhdBackBtn'){
+      document.body.className = (document.body.className || '').split(' ').filter(function(c){
+        return !c.startsWith('scr-');
+      }).join(' ') + ' scr-history';
+      renderHistoryScreen();
+    }
+  });
+
+
+  /* ───────────────────────────────────────
+     履歴一覧画面のレンダリング
+     ─────────────────────────────────────── */
+  let _currentSort = 'date';
+  let _currentCourseFilter = '';
+  let _currentPeriodFilter = '';
+
+  function renderHistoryScreen(){
+    const list = RoundStorage.list();
+
+    // 集計（全データ）
+    const counts = list.length;
+    const scores = list.map(function(r){ return Number(r.totalScore)||0; }).filter(function(v){ return v>0; });
+    const best = scores.length ? Math.min.apply(null, scores) : null;
+    const avg  = scores.length ? (scores.reduce(function(a,b){return a+b;}, 0) / scores.length) : null;
+    document.getElementById('rhStatCount').textContent = counts;
+    document.getElementById('rhStatBest').textContent  = best !== null ? best : '―';
+    document.getElementById('rhStatAvg').textContent   = avg !== null ? avg.toFixed(1) : '―';
+
+    // コースフィルタ選択肢を更新
+    const courseSet = {};
+    list.forEach(function(r){ if (r.course) courseSet[r.course] = true; });
+    const selCourse = document.getElementById('rhFilterCourse');
+    const currentSel = selCourse.value;
+    selCourse.innerHTML = '<option value="">全コース</option>';
+    Object.keys(courseSet).forEach(function(c){
+      const opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      if (c === currentSel) opt.selected = true;
+      selCourse.appendChild(opt);
+    });
+
+    // フィルタ・ソート適用
+    let filtered = list.slice();
+    if (_currentCourseFilter){
+      filtered = filtered.filter(function(r){ return r.course === _currentCourseFilter; });
+    }
+    if (_currentPeriodFilter){
+      if (_currentPeriodFilter === '5' || _currentPeriodFilter === '10'){
+        const n = parseInt(_currentPeriodFilter, 10);
+        filtered = filtered.slice(0, n);
+      } else if (_currentPeriodFilter === '3m'){
+        const cutoff = Date.now() - 90*86400000;
+        filtered = filtered.filter(function(r){
+          return new Date(r.dateRaw || r.savedAt).getTime() >= cutoff;
+        });
+      } else if (_currentPeriodFilter === '1y'){
+        const cutoff = Date.now() - 365*86400000;
+        filtered = filtered.filter(function(r){
+          return new Date(r.dateRaw || r.savedAt).getTime() >= cutoff;
+        });
+      }
+    }
+    if (_currentSort === 'score'){
+      filtered.sort(function(a,b){ return (Number(a.totalScore)||999) - (Number(b.totalScore)||999); });
+    } else {
+      filtered.sort(function(a,b){
+        return new Date(b.dateRaw || b.savedAt).getTime() - new Date(a.dateRaw || a.savedAt).getTime();
+      });
+    }
+
+    // リスト描画
+    const listEl = document.getElementById('rhList');
+    if (!filtered.length){
+      listEl.innerHTML = '<div class="rh-empty">該当するラウンドがありません</div>';
+      return;
+    }
+    listEl.innerHTML = filtered.map(function(r){
+      const diff = (Number(r.totalScore)||0) - (Number(r.par)||0);
+      const diffStr = diff === 0 ? 'E' : (diff > 0 ? '+'+diff : String(diff));
+      return '<div class="rh-card" data-id="'+r.id+'">'+
+        '<div class="rh-card-score">'+
+          '<div class="rh-card-score-val">'+(r.totalScore||'―')+'</div>'+
+          '<div class="rh-card-score-diff">'+diffStr+'</div>'+
+        '</div>'+
+        '<div class="rh-card-body">'+
+          '<div class="rh-card-date">'+(r.date||'―')+'</div>'+
+          '<div class="rh-card-course">'+(r.course||'―')+'</div>'+
+          '<div class="rh-card-meta">'+(r.holes||18)+'H ・ '+(r.tee||'REG')+'</div>'+
+        '</div>'+
+        '</div>';
+    }).join('');
+  }
+
+  // フィルタ・ソートのイベント
+  document.addEventListener('change', function(e){
+    if (e.target.id === 'rhFilterCourse'){
+      _currentCourseFilter = e.target.value;
+      renderHistoryScreen();
+    }
+    if (e.target.id === 'rhFilterPeriod'){
+      _currentPeriodFilter = e.target.value;
+      renderHistoryScreen();
+    }
+  });
+  document.addEventListener('click', function(e){
+    const sortBtn = e.target.closest('.rh-sort-btn');
+    if (sortBtn){
+      _currentSort = sortBtn.getAttribute('data-sort') || 'date';
+      document.querySelectorAll('.rh-sort-btn').forEach(function(b){
+        b.classList.toggle('active', b === sortBtn);
+      });
+      renderHistoryScreen();
+    }
+    // 履歴カードタップ → 詳細
+    const card = e.target.closest('.rh-card');
+    if (card){
+      const id = card.getAttribute('data-id');
+      if (id) navigateToHistoryDetail(id);
+    }
+  });
+
+
+  /* ───────────────────────────────────────
+     履歴詳細画面のレンダリング
+     ─────────────────────────────────────── */
+  function renderHistoryDetail(id){
+    const r = RoundStorage.findById(id);
+    if (!r){
+      showToast_('履歴が見つかりません', true);
+      return;
+    }
+    document.getElementById('rhdCourse').textContent = r.course || '―';
+    document.getElementById('rhdDate').textContent   = (r.date || '―') + ' ' + (r.startSide ? '('+r.startSide+'スタート)' : '');
+    document.getElementById('rhdMeta').textContent   = (r.holes||18) + 'H ・ ' + (r.tee||'REG') + ' ・ Par '+ (r.par||72);
+    document.getElementById('rhdScore').textContent  = r.totalScore || '―';
+    const diff = (Number(r.totalScore)||0) - (Number(r.par)||0);
+    const diffStr = diff === 0 ? 'E' : (diff > 0 ? '+'+diff : String(diff));
+    document.getElementById('rhdDiff').textContent   = diffStr;
+    document.getElementById('rhdTitle').textContent  = r.course || 'ラウンド詳細';
+    document.getElementById('rhdSubtitle').textContent = r.date || '';
+
+    // スコア表
+    const holes = r.holes || 18;
+    const halfH = holes === 9 ? 9 : 9;
+    const players = r.players || [];
+    const me = players.filter(function(p){ return p.type==='me'; })[0] || players[0];
+
+    function buildTable(startIdx, endIdx, label){
+      let html = '<table class="rhd-table"><thead><tr>';
+      html += '<th class="head-'+(label==='OUT'?'out':'in')+'">'+label+'</th>';
+      for (let h=startIdx; h<endIdx; h++) html += '<th>'+(h+1)+'</th>';
+      html += '<th>計</th></tr><tr>';
+      html += '<th>Par</th>';
+      let parSum = 0;
+      for (let h=startIdx; h<endIdx; h++){
+        const p = (r.coursePars||[])[h] || '―';
+        if (typeof p === 'number') parSum += p;
+        html += '<th>'+p+'</th>';
+      }
+      html += '<th>'+parSum+'</th></tr></thead><tbody>';
+      players.forEach(function(pl){
+        const isMe = pl.type === 'me' || pl === me;
+        html += '<tr>';
+        html += '<td class="'+(isMe?'me':'')+'" style="text-align:left;font-weight:600;">'+(pl.name||'―')+'</td>';
+        let pSum = 0;
+        for (let h=startIdx; h<endIdx; h++){
+          const sc = (pl.scores||[])[h];
+          if (sc !== null && sc !== undefined) pSum += sc;
+          html += '<td class="'+(isMe?'me':'')+'">'+(sc!==null && sc!==undefined ? sc : '―')+'</td>';
+        }
+        html += '<td class="'+(isMe?'me':'')+'" style="font-weight:700;">'+(pSum||'―')+'</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      return html;
+    }
+
+    let tableHTML = '';
+    if (holes === 18){
+      tableHTML += buildTable(0, 9, 'OUT');
+      tableHTML += '<div style="height:8px;"></div>';
+      tableHTML += buildTable(9, 18, 'IN');
+    } else {
+      tableHTML += buildTable(0, 9, 'OUT');
+    }
+    document.getElementById('rhdTableHolder').innerHTML = tableHTML;
+
+    // 共有
+    document.getElementById('rhdShareLine').onclick = function(){ shareRound(r, 'line'); };
+    document.getElementById('rhdShareCopy').onclick = function(){ shareRound(r, 'copy'); };
+    document.getElementById('rhdDelete').onclick    = function(){
+      if (confirm('このラウンド履歴を削除しますか？')){
+        RoundStorage.remove(r.id);
+        showToast_('削除しました');
+        setTimeout(function(){
+          document.body.className = (document.body.className || '').split(' ').filter(function(c){
+            return !c.startsWith('scr-');
+          }).join(' ') + ' scr-history';
+          renderHistoryScreen();
+        }, 400);
+      }
+    };
+  }
+
+
+  /* ───────────────────────────────────────
+     共有（LINE/コピー）
+     ─────────────────────────────────────── */
+  function shareRound(r, mode){
+    const diff = (Number(r.totalScore)||0) - (Number(r.par)||0);
+    const diffStr = diff === 0 ? 'E' : (diff > 0 ? '+'+diff : String(diff));
+    const text = '⛳ ラウンドスコア\n'+
+      '日付: '+r.date+'\n'+
+      'コース: '+r.course+'\n'+
+      'スコア: '+r.totalScore+' ('+diffStr+')\n'+
+      'ホール: '+(r.holes||18)+'H ・ ティー: '+(r.tee||'REG')+'\n'+
+      '#G-LAND #ゴルフ';
+
+    if (mode === 'copy'){
+      if (navigator.clipboard){
+        navigator.clipboard.writeText(text).then(function(){
+          showToast_('コピーしました 📋');
+        }, function(){ showToast_('コピーに失敗', true); });
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast_('コピーしました 📋');
+      }
+    } else if (mode === 'line'){
+      const url = 'https://line.me/R/msg/text/?' + encodeURIComponent(text);
+      window.open(url, '_blank');
+    }
+  }
+
+
+  /* ───────────────────────────────────────
+     マイページ内のラウンド履歴（最新3件）
+     ─────────────────────────────────────── */
+  function renderMyHistoryMini(){
+    const el = document.getElementById('myHistory');
+    if (!el) return;
+    const list = RoundStorage.list().slice(0, 3);
+    if (!list.length){
+      el.innerHTML = 'まだラウンド履歴はありません';
+      return;
+    }
+    let html = '';
+    list.forEach(function(r){
+      const diff = (Number(r.totalScore)||0) - (Number(r.par)||0);
+      const diffStr = diff === 0 ? 'E' : (diff > 0 ? '+'+diff : String(diff));
+      html += '<div class="mh-line">'+
+        '<span class="mh-score">'+(r.totalScore||'―')+'</span>'+
+        '<div class="mh-info">'+
+          '<div class="mh-course">'+(r.course||'―')+'</div>'+
+          '<div class="mh-date">'+(r.date||'―')+' ・ '+(r.holes||18)+'H ('+diffStr+')</div>'+
+        '</div>'+
+      '</div>';
+    });
+    html += '<button class="mh-see-all" id="mhSeeAll">📊 すべての履歴を見る ('+RoundStorage.list().length+'件)</button>';
+    el.innerHTML = html;
+  }
+  document.addEventListener('click', function(e){
+    if (e.target.id === 'mhSeeAll'){
+      navigateToHistory();
+    }
+  });
+  // マイページ表示時に履歴ミニも描画
+  function observeMypage(){
+    setInterval(function(){
+      if (document.body.classList.contains('scr-mypage')){
+        renderMyHistoryMini();
+      }
+    }, 2000);
+  }
+  observeMypage();
+
+
+  /* ───────────────────────────────────────
+     ホーム画面に「📊 履歴」ボタンを動的追加
+     ─────────────────────────────────────── */
+  function injectHistoryHomeCard(){
+    const home = document.getElementById('screen-home');
+    if (!home) return;
+    // すでに追加済みならスキップ
+    if (home.querySelector('[data-nav="history"]')) return;
+    // 最初の home-grid を取得
+    const grids = home.querySelectorAll('.home-grid');
+    if (!grids.length) return;
+    const card = document.createElement('button');
+    card.className = 'home-card history-card';
+    card.setAttribute('data-nav', 'history');
+    card.innerHTML = '<span class="hc-badge">READY</span>' +
+                     '<span class="hc-ico">📊</span>' +
+                     '<span class="hc-ttl">履歴</span>' +
+                     '<span class="hc-sub">ラウンド記録</span>';
+    card.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      navigateToHistory();
+    });
+    grids[0].appendChild(card);
+  }
+  // DOM 完了後に注入
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', injectHistoryHomeCard);
+  } else {
+    setTimeout(injectHistoryHomeCard, 100);
+  }
+
+})();
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+
 </body>
 </html>

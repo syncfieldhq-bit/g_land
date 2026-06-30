@@ -7896,10 +7896,53 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
     setTimeout(injectHistoryHomeCard, 100);
   }
 
+
+  /* ----------------------------------------------
+     v85.4.2 fix: hook confirm buttons directly
+     - When btnPanelConfirm or iproCommitBtn is clicked,
+       check if all holes are filled, then open save sheet.
+     ---------------------------------------------- */
+
+  // expose globally for manual trigger
+  window.openRoundFinishSheet = openSheet;
+
+  function hookConfirmButtons(){
+    if (window.__rhConfirmHooked) return;
+    window.__rhConfirmHooked = true;
+
+    document.addEventListener('click', function(e){
+      var target = e.target;
+      if (!target || !target.id) return;
+      if (target.id !== 'btnPanelConfirm' && target.id !== 'iproCommitBtn') return;
+
+      setTimeout(function(){
+        try {
+          var cur = collectCurrentRound();
+          if (cur.filledHoles >= cur.holes && cur.holes > 0){
+            var sheet = document.getElementById('rhSheet');
+            if (sheet && sheet.classList.contains('show')) return;
+            setTimeout(function(){
+              try { openSheet(); }
+              catch(e){ console.error('[RH v85.4.2] openSheet error', e); }
+            }, 1200);
+          }
+        } catch(e){ console.error('[RH v85.4.2] confirm hook err', e); }
+      }, 600);
+    }, true);
+
+    console.log('[RoundHistory v85.4.2] confirm-button hook ready');
+  }
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', hookConfirmButtons);
+  } else {
+    hookConfirmButtons();
+  }
+
 })();
 </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 
 
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

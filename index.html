@@ -1585,7 +1585,26 @@ button, .dash-cell, .card-side-close, .card-side-qr,
 .pane-meta .pi-saved em{ color:#2b8a4c; font-style:normal; font-weight:700; }
 
 /* ==========================================================
- * v85.3.6 : 情報交換エリア (広告 / 告知 / 3ボタン)
+ 
+/* ============================================================
+   v85.4.6-phase1 patches  (2025-06-30)
+   ① 自分入力ボタン: 非表示 (JS機能は温存)
+   ② PRO→スコア入力 のラベル系
+   ============================================================ */
+/* ② 「自分入力」ボタンは非表示。is-active 等のJS制御は維持。 */
+#btnSwitchToInput{ display:none !important; }
+/* PRO の準備中バッジは Phase-1 で外す */
+#btnSwitchToInputPro .cms-cs-badge{ display:none !important; }
+#btnSwitchToInputPro.is-coming-soon{ opacity:1 !important; }
+/* Phase-1: PRO→スコア入力 タブの初期 is-active も視覚的にスタンバイ */
+#btnSwitchToInputPro.is-active{ background:#2b8a4c; color:#fff; }
+
+
+/* ④ commit-row : 確定ボタン単独表示 (前H削除後の幅調整) */
+.ipro-commit-row{ justify-content:center !important; }
+.ipro-commit-row .ipro-commit-btn{ flex: 1 1 auto !important; max-width: 480px !important; }
+
+* v85.3.6 : 情報交換エリア (広告 / 告知 / 3ボタン)
  *   - paneInput の cardScroll 直下に配置
  *   - スコアカードを邪魔せず、フッターまでのスペースを有効活用
  * ========================================================== */
@@ -2268,9 +2287,8 @@ body.is-score-pad-open .info-zone{ display:none !important; }
       <button class="cms-btn cms-host is-guest-hidden" data-mode="hostCheck" id="btnOpenHostCheck" type="button">
         <span class="cms-ico">🛡</span>監督
       </button>
-      <button class="cms-btn cms-pro is-coming-soon" data-mode="inputPro" id="btnSwitchToInputPro" type="button" aria-label="PRO (準備中)">
-        <span class="cms-ico">🎯</span>PRO
-        <span class="cms-cs-badge">準備中</span>
+      <button class="cms-btn cms-pro" data-mode="inputPro" id="btnSwitchToInputPro" type="button" aria-label="スコア入力">
+        <span class="cms-ico">📝</span>スコア入力
       </button>
     </div>
 
@@ -2285,41 +2303,7 @@ body.is-score-pad-open .info-zone{ display:none !important; }
       </div>
 
       <!-- ===== v85.3.6 : 情報交換エリア (paneInput 内・スコアカード直下) ===== -->
-      <div class="info-zone" id="infoZone" aria-label="広告・告知・情報交換">
-        <!-- ① 広告枠 -->
-        <div class="info-ad" id="infoAdSlot">
-          <div class="info-ad-placeholder">
-            <span class="info-ad-tag">広告</span>
-            <span class="info-ad-msg">ここに広告が表示されます</span>
-          </div>
-        </div>
-        <!-- ② 告知欄 -->
-        <div class="info-notice" id="infoNoticeSlot">
-          <div class="info-notice-head">
-            <span class="info-notice-tag">📢 告知</span>
-            <span class="info-notice-time" id="infoNoticeTime">—</span>
-          </div>
-          <div class="info-notice-body" id="infoNoticeBody">
-            お知らせはありません
-          </div>
-        </div>
-        <!-- ③ 情報交換ボタン (3つ横並び) -->
-        <div class="info-actions">
-          <button class="info-btn" id="infoBtnPhoto" type="button" aria-label="写真UP">
-            <span class="info-btn-ico">📷</span>
-            <span class="info-btn-lbl">写真UP</span>
-          </button>
-          <button class="info-btn" id="infoBtnCopy" type="button" aria-label="スコアコピー">
-            <span class="info-btn-ico">📋</span>
-            <span class="info-btn-lbl">ｺﾋﾟｰ</span>
-          </button>
-          <button class="info-btn" id="infoBtnLine" type="button" aria-label="LINE">
-            <span class="info-btn-ico">💬</span>
-            <span class="info-btn-lbl">LINE</span>
-          </button>
-        </div>
-      </div>
-      <!-- ===== /v85.3.6 情報交換エリア ===== -->
+      <!-- v85.4.6-phase1: infoZone(広告/告知/写真UP/ｺﾋﾟｰ/LINE) 削除済 → Phase-2で保存モーダル内に再配置予定 -->
     </div>
 
     <!-- ===== Pane B : 組表示 (read-only, 横長テーブル) ===== -->
@@ -2418,8 +2402,9 @@ body.is-score-pad-open .info-zone{ display:none !important; }
           </div>
         </div>
         <div class="ipro-commit-row">
-          <button class="ipro-skip-btn" id="iproSkipBtn" type="button">前H ←</button>
-          <button class="ipro-commit-btn" id="iproCommitBtn" type="button">✅ 確定 → 次H</button>
+          <!-- v85.4.6-phase1: 前H ボタンは非表示化(JS機能は温存)。Phase-2でセルタップ修正フローに置換 -->
+          <button class="ipro-skip-btn" id="iproSkipBtn" type="button" style="display:none !important;" aria-hidden="true">前H ←</button>
+          <button class="ipro-commit-btn" id="iproCommitBtn" type="button">✅ 確定</button>
         </div>
       </div>
     </div>
@@ -8151,6 +8136,7 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
   console.log('[round-reset-bridge v85.4.5] ready');
 })();
 </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

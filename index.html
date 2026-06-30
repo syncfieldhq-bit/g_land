@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#2d9d5f">
-  <meta name="description" content="G-WORLD v85 - ゴルフスコア管理 (v85.3.5 UI × v80 通信)">
+  <meta name="description" content="G-WORLD v85 - ゴルフスコア管理 (v72.2.1 UI × v80 通信)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="G-WORLD">
@@ -146,7 +146,14 @@ a{ color:var(--c-green-dark); text-decoration:none; }
 body.scr-register .screen#screen-register{ display:block; padding:0; }
 body.scr-home     .screen#screen-home    { display:block; }
 body.scr-prep     .screen#screen-prep    { display:block; }
-body.scr-card .screen#screen-card{ display:flex; flex-direction:column; padding-top:calc(env(safe-area-inset-top) + 0px); padding-bottom:calc(var(--nav-h) + var(--safe-bottom) + 0px); }
+body.scr-card     .screen#screen-card    { display:flex; flex-direction:column; padding-bottom:0; padding-top:calc(env(safe-area-inset-top) + 96px); /* v85.3.4-hotfix: プロ画面のツールバーをヘッダ下に押し下げる */ }
+
+/* v85.3.4-hotfix : PRO 起動中は画面最上端から直接 toolbar を始めないよう、
+   上に必ず safe-area + 96px ぶんの領域を確保する */
+body.scr-input-pro #screen-card,
+body.scr-input-pro{
+  padding-top:calc(env(safe-area-inset-top) + 96px) !important;
+}
 body.scr-compete  .screen#screen-compete { display:block; }
 body.scr-mypage   .screen#screen-mypage  { display:block; }
 body.scr-register .bottom-nav{ display:none; }
@@ -364,7 +371,7 @@ body.scr-register .bottom-nav{ display:none; }
 }
 .card-dash{
   background:#fff;
-  padding:4px 12px;
+  padding:10px 12px;
   border-bottom:1px solid var(--c-line);
   flex-shrink:0;                                    /* ★ ヘッダーは縮まない */
 }
@@ -1079,9 +1086,6 @@ body.scr-register .bottom-nav{ display:none; }
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   will-change: scroll-position;
-  flex: 1 1 auto;        /* 中味が増えても縮める */
-  min-height: 0;          /* flex 子の高さ詰まり回避 */
-  overflow-y: auto;       /* 溢れたら縦スクロール */
 }
 
 /* 入力パネル : 開閉アニメ用のレイヤ予告
@@ -1270,10 +1274,10 @@ body.scr-register .bottom-nav{ display:none; }
  * ============================================================ */
 :root { --gw-safe-top: env(safe-area-inset-top, 0px); }
 #screen-card .card-dash{
-  padding-top: 0px;
+  padding-top: max(8px, env(safe-area-inset-top));
 }
 #screen-card .card-modeswitch{
-  padding-top: 0px;
+  padding-top: 4px;
 }
 
 /* v85.3.1 : Safari 連打ズーム抑制 (アクセシビリティ温存) */
@@ -1585,24 +1589,26 @@ button, .dash-cell, .card-side-close, .card-side-qr,
 .pane-meta .pi-saved em{ color:#2b8a4c; font-style:normal; font-weight:700; }
 
 /* ==========================================================
- * v85.3.6 : 情報交換エリア (広告 / 告知 / 3ボタン)
+ * v85.3.6.6 : 情報交換エリア (広告 / 告知 / 3ボタン)
  *   - paneInput の cardScroll 直下に配置
- *   - スコアカードを邪魔せず、フッターまでのスペースを有効活用
+ *   - v85.3.6.6 で margin / gap を圧縮して、合計高さを約 40px 削減
+ *   - これでカード領域 flex の縮みを防ぎ上部ツールバー連鎖の押し潰れを解消
  * ========================================================== */
 .info-zone{
-  margin: 16px 12px 24px 12px;
+  margin: 8px 10px 12px 10px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
+  flex-shrink: 0;
 }
-/* ① 広告枠 (80px 程度) */
+/* ① 広告枠 (64px に縮小) */
 .info-ad{
-  min-height: 76px;
+  min-height: 60px;
   border: 1.5px dashed #d4c45a;
   background: linear-gradient(180deg, #fff9e0 0%, #fff5c8 100%);
   border-radius: 10px;
   display:flex; align-items:center; justify-content:center;
-  padding: 8px 12px;
+  padding: 6px 10px;
 }
 .info-ad-placeholder{ display:flex; flex-direction:column; align-items:center; gap:4px; }
 .info-ad-tag{
@@ -1611,14 +1617,14 @@ button, .dash-cell, .card-side-close, .card-side-qr,
 }
 .info-ad-msg{ font-size:12px; color:#9a7a18; }
 
-/* ② 告知欄 (60px 程度) */
+/* ② 告知欄 (48px に縮小) */
 .info-notice{
-  min-height: 56px;
+  min-height: 44px;
   border: 1px solid #c7e0c9;
   background: #f3fbf4;
   border-radius: 10px;
-  padding: 8px 12px;
-  display:flex; flex-direction:column; gap:4px;
+  padding: 6px 10px;
+  display:flex; flex-direction:column; gap:2px;
 }
 .info-notice-head{
   display:flex; align-items:center; justify-content:space-between;
@@ -1646,7 +1652,7 @@ button, .dash-cell, .card-side-close, .card-side-qr,
   gap: 4px;
   cursor: pointer;
   transition: transform .08s ease, box-shadow .15s ease, background .15s ease;
-  min-height: 72px;
+  min-height: 64px;
   box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 2px 4px rgba(0,0,0,.03);
 }
 .info-btn:active{ transform: scale(.96); background:#eaf0f5; }
@@ -2060,15 +2066,15 @@ body.is-score-pad-open .info-zone{ display:none !important; }
       <div class="reg-form">
         <!-- v71.2 仕様 : 5項目セット 姓 → 名 → ふりがな(姓) → ふりがな(名) → ニックネーム -->
         <label class="reg-field"><span class="reg-lbl">姓 (名字) <em>必須</em></span>
-          <input id="regFamily" class="reg-input" maxlength="16" placeholder="例: 神戸"></label>
+          <input id="regFamily" class="reg-input" maxlength="16" placeholder="例: 佐藤"></label>
         <label class="reg-field"><span class="reg-lbl">名 (名前) <em>必須</em></span>
-          <input id="regFirst" class="reg-input" maxlength="16" placeholder="例: 太郎"></label>
+          <input id="regFirst" class="reg-input" maxlength="16" placeholder="例: 伸一郎"></label>
         <label class="reg-field"><span class="reg-lbl">ふりがな (名字) <em>必須</em></span>
-          <input id="regKana" data-legacy-id="regKanaFamily" class="reg-input" maxlength="24" placeholder="例: こうべ" autocomplete="off"></label>
+          <input id="regKana" data-legacy-id="regKanaFamily" class="reg-input" maxlength="24" placeholder="例: さとう" autocomplete="off"></label>
         <label class="reg-field"><span class="reg-lbl">ふりがな (名前) <em>必須</em></span>
-          <input id="regKanaFirst" data-legacy-id="regKanaFirst" class="reg-input" maxlength="24" placeholder="例: たろう" autocomplete="off"></label>
+          <input id="regKanaFirst" data-legacy-id="regKanaFirst" class="reg-input" maxlength="24" placeholder="例: しんいちろう" autocomplete="off"></label>
         <label class="reg-field"><span class="reg-lbl">ニックネーム <em>必須</em></span>
-          <input id="regNick" class="reg-input" maxlength="16" placeholder="例: たろたん"></label>
+          <input id="regNick" class="reg-input" maxlength="16" placeholder="例: ロンリーマキロン"></label>
         <button id="regSubmit" class="reg-submit">プロフィールを登録して開始</button>
       </div>
     </div></div>
@@ -2079,7 +2085,7 @@ body.is-score-pad-open .info-zone{ display:none !important; }
     <header class="page-head">
       <div class="ph-greet">こんにちは 👋</div>
       <div class="ph-name"><span id="homeUserName">ゲスト</span> さん</div>
-      <div class="ph-sub">六甲国際パブリックコース 配布版 <span id="gwVersionLabel">v85.3.5</span></div>
+      <div class="ph-sub">六甲国際パブリックコース 配布版 <span id="gwVersionLabel">v72.2.1</span></div>
     </header>
     <main class="page-body">
       <h3 class="sect-ttl">● 利用可能な機能</h3>
@@ -2453,11 +2459,11 @@ body.is-score-pad-open .info-zone{ display:none !important; }
       <h3 class="sect-ttl">▌ プロフィール編集（本名）</h3>
       <div class="my-form">
         <!-- v71.2 仕様 : 登録画面と同じ並び 姓→名→ふりがな姓→ふりがな名→ニックネーム -->
-        <label class="my-field"><span>姓（名字）<em>必須</em></span><input id="myFamily" maxlength="16" placeholder="例: 神戸"></label>
-        <label class="my-field"><span>名（名前）<em>必須</em></span><input id="myFirst" maxlength="16" placeholder="例: 太郎"></label>
-        <label class="my-field"><span>ふりがな（名字）<em>必須</em></span><input id="myKana" class="my-input" maxlength="24" placeholder="例：こうべ" autocomplete="off"></label>
-        <label class="my-field"><span>ふりがな（名前）<em>必須</em></span><input id="myKanaFirst" class="my-input" maxlength="24" placeholder="例：たろう" autocomplete="off"></label>
-        <label class="my-field"><span>ニックネーム<em>必須</em></span><input id="myNick" maxlength="16" placeholder="例: たろたん"></label>
+        <label class="my-field"><span>姓（名字）<em>必須</em></span><input id="myFamily" maxlength="16" placeholder="例: 佐藤"></label>
+        <label class="my-field"><span>名（名前）<em>必須</em></span><input id="myFirst" maxlength="16" placeholder="例: 伸一郎"></label>
+        <label class="my-field"><span>ふりがな（名字）<em>必須</em></span><input id="myKana" class="my-input" maxlength="24" placeholder="例：さとう" autocomplete="off"></label>
+        <label class="my-field"><span>ふりがな（名前）<em>必須</em></span><input id="myKanaFirst" class="my-input" maxlength="24" placeholder="例：しんいちろう" autocomplete="off"></label>
+        <label class="my-field"><span>ニックネーム<em>必須</em></span><input id="myNick" maxlength="16" placeholder="例: ロンリーマキロン"></label>
       </div>
       <h3 class="sect-ttl">▌ コース調整 (ハンデ)</h3>
       <div class="my-form">
@@ -2746,7 +2752,7 @@ body.is-score-pad-open .info-zone{ display:none !important; }
      *   ⑤ クライアント保存バージョンとの差分を判定 (state.html へバトンタッチ)
      * ============================================================ */
     window.GW_BOOT = {
-      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.6.1",
+      version       : (window.GWORLD_CONFIG && window.GWORLD_CONFIG.APP_VERSION) || "v85.3.6.6",
       versionCode   : 85000,
       buildAt       : new Date().toISOString(),
       course        : "Rokko Kokusai Public",
@@ -6895,7 +6901,6 @@ _bindSafe('orientation',     bindOrientation);
 </script>
 
 
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <!--
 ═══════════════════════════════════════════════════════════════════
  ラウンド履歴保存機能 (v85.4.0)
@@ -7894,9 +7899,44 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
     setTimeout(injectHistoryHomeCard, 100);
   }
 
+
+  /* ───────────────────────────────────
+     v85.4.1 修正：既存「全ホール入力完了」との連動
+     ─ 既存の toast('全ホール入力完了！...') をフックして
+        自動的に保存ダイアログを表示
+     ─ 既存の index.html に手を入れずに、このパッチだけで連動可能
+     ─────────────────────────────────── */
+
+  // グローバルに openSheet を公開（手動呼び出しも可能）
+  window.openRoundFinishSheet = openSheet;
+
+  // 既存の window.toast をフックして「全ホール入力完了」を検出
+  function hookToastForRoundFinish(){
+    if (!window.toast) {
+      // toast がまだ未ロード → 少し後に再試行
+      setTimeout(hookToastForRoundFinish, 500);
+      return;
+    }
+    if (window.__rhToastHooked) return;
+    window.__rhToastHooked = true;
+    const _origToast = window.toast;
+    window.toast = function(msg){
+      try { _origToast.apply(this, arguments); } catch(e){}
+      try {
+        if (typeof msg === 'string' && msg.indexOf('全ホール入力完了') >= 0){
+          // パネルが閉じるのを待ってからダイアログ表示
+          setTimeout(function(){ try { openSheet(); } catch(e){ console.error('[RH] openSheet error', e); } }, 1000);
+        }
+      } catch(e){ console.error('[RH] toast hook err', e); }
+    };
+    console.log('[RoundHistory v85.4.1] toast hook ready');
+  }
+  hookToastForRoundFinish();
+
 })();
 </script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 
+
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

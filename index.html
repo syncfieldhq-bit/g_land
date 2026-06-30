@@ -8071,5 +8071,86 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
 })();
 </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+
+<script id="round-reset-bridge-v85.4.5">
+(function(){
+  if (window.__rhResetBridgeBound) return;
+  window.__rhResetBridgeBound = true;
+
+  /**
+   * 保存後のラウンド状態リセット (自分だけは残す)
+   * - 履歴ストレージ gw_round_history_v1 には絶対に触らない
+   * - 既存の Store.set を使って整合性を保つ (saveLS は内部で呼ばれる)
+   * - roundId/groupId をクリアすることで、次の startRound() が新規開始ルートに乗る
+   */
+  function resetRoundStateForNextRound(){
+    try {
+      if (typeof Store === 'undefined' || typeof Store.get !== 'function') {
+        console.warn('[round-reset] Store 未定義 → スキップ');
+        return false;
+      }
+      var s = Store.get();
+      if (!s || typeof s !== 'object') s = {};
+
+      // 1) プレイヤーは「自分(type:me)」だけ残す
+      var players = Array.isArray(s.players) ? s.players : [];
+      var keptPlayers = players.filter(function(p){
+        if (!p) return false;
+        return (p.type === 'me' || p.isMe === true || p.owner === true ||
+                (p.userId && p.userId === s.userId));
+      });
+
+      // 2) スコアは「残したプレイヤー」のキーだけ空配列で残し、それ以外は削除
+      var newScores = {};
+      var keptNames = keptPlayers.map(function(p){ return p.name; }).filter(Boolean);
+      keptNames.forEach(function(name){
+        newScores[name] = { stroke:[], putt:[], penalty:[], ob:[], fairway:[] };
+      });
+
+      // 3) Store.set 経由で一括反映 (内部で saveLS と通知が走る)
+      Store.set({
+        roundId       : '',
+        groupId       : '',
+        activeRoundId : '',
+        activeGroupId : '',
+        scores        : newScores,
+        players       : keptPlayers,
+        currentHole   : 1,
+        currentHoleNo : 1,
+        joinMode      : false,
+        joinPending   : false
+      });
+
+      // 4) 再描画 (存在する関数だけ叩く)
+      try { if (typeof renderPrep === 'function') renderPrep(); } catch(_){}
+      try { if (typeof renderHome === 'function') renderHome(); } catch(_){}
+      try { if (typeof renderMyHistoryMini === 'function') renderMyHistoryMini(); } catch(_){}
+
+      console.log('[round-reset v85.4.5] cleared. 自分残し / スコアゼロ / roundId空');
+      return true;
+    } catch(e){
+      console.error('[round-reset v85.4.5] failed', e);
+      return false;
+    }
+  }
+  window.resetRoundStateForNextRound = resetRoundStateForNextRound;
+
+  /* Hook: 既存の保存ボタン(rhSheetSave)押下後 350ms 待ってリセット
+     (既存 v85.4.4 ブリッジの RoundStorage.save 完了を確実に待つ) */
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if (!t || !t.id) return;
+    if (t.id !== 'rhSheetSave' && t.id !== 'rh-sheet-save') return;
+    setTimeout(resetRoundStateForNextRound, 350);
+  }, true);
+
+  /* Hook 2: 「後で」ボタンの場合もシートを閉じるが、リセットは行わない
+     (=明示的に保存しなかったので、入力中スコアは保持) */
+  // 「後で」のID は rhSheetLater 系を想定 / 何もしない(意図通り)
+
+  console.log('[round-reset-bridge v85.4.5] ready');
+})();
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

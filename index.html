@@ -7376,7 +7376,7 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
      CurrentRound : 今のラウンド情報を Store から組み立てる
      ─────────────────────────────────────── */
   function collectCurrentRound(){
-    const s = (window.Store && Store.getState && Store.getState()) || {};
+    const s = (window.Store && (Store.get||Store.getState) && (Store.get?Store.get():Store.getState())) || {};
     const COURSE = window.COURSE || {};
 
     // ホール数（9 or 18）
@@ -7943,6 +7943,133 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 
 
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+
+<script id="round-save-gas-bridge">
+(function(){
+  if (window.__rhSaveBridgeBound) return;
+  window.__rhSaveBridgeBound = true;
+
+  function getCfgUrl(){
+    return (window.GWORLD_CONFIG && window.GWORLD_CONFIG.GAS_WEB_APP_URL) || '';
+  }
+
+  function postToGAS(payload){
+    var url = getCfgUrl();
+    if (!url){
+      console.warn('[rhSave] GAS_WEB_APP_URL 未設定 → ローカル保存のみ');
+      return Promise.resolve({ ok:false, error:'WEB_APP_URL not configured', _offline:true });
+    }
+    return fetch(url, {
+      method:'POST',
+      mode:'cors',
+      cache:'no-cache',
+      redirect:'follow',
+      headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+      body: JSON.stringify({ fn:'saveRoundResult', payload: payload })
+    }).then(function(r){
+      if (!r.ok) throw new Error('HTTP '+r.status+' '+r.statusText);
+      return r.text();
+    }).then(function(txt){
+      try { return JSON.parse(txt); }
+      catch(_){ return { ok:true, raw:txt }; }
+    }).catch(function(e){
+      console.error('[rhSave] GAS送信失敗 → ローカル保留に積む', e);
+      try{
+        var q = JSON.parse(localStorage.getItem('rh_pending_queue')||'[]');
+        q.push({ payload:payload, failedAt:new Date().toISOString(), error:String(e) });
+        localStorage.setItem('rh_pending_queue', JSON.stringify(q));
+      }catch(_){}
+      return { ok:false, error:String(e), _queued:true };
+    });
+  }
+
+  function persistLocal(payload){
+    try{
+      var list = JSON.parse(localStorage.getItem('rh_round_history')||'[]');
+      var rec = Object.assign({}, payload, {
+        id: payload.id || ('r_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)),
+        savedAt: new Date().toISOString()
+      });
+      list.unshift(rec);
+      localStorage.setItem('rh_round_history', JSON.stringify(list));
+      return rec;
+    } catch(e){
+      console.error('[rhSave] localStorage 保存失敗', e);
+      return null;
+    }
+  }
+
+  // 既存の保存ボタン (rhSheetSave) を横取りして、GAS送信＋ローカル保存
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if (!t || !t.id) return;
+    if (t.id !== 'rhSheetSave') return;
+    try {
+      var collect = window.collectCurrentRound || (window.__rh && window.__rh.collectCurrentRound);
+      var data = (typeof collect === 'function') ? collect() : null;
+      if (!data) {
+        console.warn('[rhSave] collectCurrentRound 未取得');
+        return;
+      }
+      var local = persistLocal(data);
+      postToGAS(local || data).then(function(res){
+        if (res && res.ok) {
+          if (typeof toast === 'function') toast('ラウンドを保存しました');
+        } else if (res && res._offline) {
+          if (typeof toast === 'function') toast('ローカル保存のみ完了（GAS未設定）');
+        } else if (res && res._queued) {
+          if (typeof toast === 'function') toast('ラウンド保存：オフライン保留');
+        } else {
+          if (typeof toast === 'function') toast('ラウンド保存：完了');
+        }
+      });
+    } catch(err){
+      console.error('[rhSave] save 処理エラー', err);
+    }
+  }, true);
+
+  // 既存パッチが「全H埋まり判定」失敗したときの保険：
+  // 18番(または9番)の確定クリック後、強制で openSheet を呼ぶフォールバック
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if (!t || !t.id) return;
+    if (t.id !== 'btnPanelConfirm' && t.id !== 'iproCommitBtn') return;
+    setTimeout(function(){
+      try {
+        var s = (window.Store && (Store.get||Store.getState) && (Store.get?Store.get():Store.getState())) || {};
+        var holesNum = (s.holeMode === 9 || s.holeMode === '9') ? 9 : 18;
+        var scoresMap = s.scores || {};
+        // 全プレイヤー全ホール埋まってるか軽く判定
+        var allFilled = true, anyPlayer=false;
+        Object.keys(scoresMap).forEach(function(name){
+          anyPlayer = true;
+          var arr = (scoresMap[name] && scoresMap[name].stroke) || [];
+          for (var i=0;i<holesNum;i++){
+            var v = arr[i];
+            if (v === null || v === undefined || v === '' || isNaN(Number(v))) { allFilled = false; }
+          }
+        });
+        if (!anyPlayer) allFilled = false;
+        if (allFilled) {
+          var sheet = document.getElementById('rhSheet');
+          if (sheet && sheet.classList.contains('show')) return; // 既に出てる
+          if (typeof window.openRoundFinishSheet === 'function') {
+            setTimeout(window.openRoundFinishSheet, 1200);
+          }
+        }
+      } catch(err){ console.error('[rhSave fallback]', err); }
+    }, 700);
+  }, true);
+
+  // collectCurrentRound をグローバル公開（パッチ内クロージャに閉じてた場合の保険）
+  if (!window.collectCurrentRound && window.__rh && typeof window.__rh.collectCurrentRound === 'function'){
+    window.collectCurrentRound = window.__rh.collectCurrentRound;
+  }
+
+  console.log('[round-save-gas-bridge] ready');
+})();
+</script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

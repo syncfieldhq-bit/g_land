@@ -1338,24 +1338,43 @@ body.scr-register .bottom-nav{ display:none; }
  * ============================================================ */
 
 /* ----- モードスイッチャ (スコア画面の上部に固定) ----- */
+/* v85.4.6 Phase-5 : タブ高さ圧縮 (3割ダウン) + 強制並列 */
 .card-modeswitch{
-  display:flex; gap:6px; padding:6px 8px;
+  display:flex !important;
+  flex-direction:row !important;
+  flex-wrap:nowrap !important;
+  gap:4px; padding:3px 6px;
   background:#f3faf5; border-bottom:1px solid #cfe5d6;
   position:sticky; top:0; z-index:5;
 }
 .cms-btn{
-  flex:1; min-height:42px;
-  border:none; border-radius:10px;
+  flex:1 1 50% !important;
+  min-height:28px !important;
+  max-height:32px;
+  border:none; border-radius:8px;
   background:#dff0e3; color:#234c33;
-  font-weight:700; font-size:13px;
-  display:flex; align-items:center; justify-content:center; gap:6px;
+  font-weight:700; font-size:12px;
+  display:flex; align-items:center; justify-content:center; gap:4px;
   transition:transform .1s, background-color .15s;
+  padding:0 6px;
 }
 .cms-btn:active{ transform:scale(.96); }
 .cms-btn.is-active{ background:#2b8a4c; color:#fff; }
 .cms-btn.cms-host{ background:#e7eef5; color:#36506e; }
 .cms-btn.cms-host.is-active{ background:#36506e; color:#fff; }
-.cms-btn .cms-ico{ font-size:16px; }
+.cms-btn .cms-ico{ font-size:13px; }
+
+/* v85.4.6 Phase-5 : panel-inline-head-slim */
+.panel-inline-head-slim{
+  padding:2px 8px;
+  background:#f7faf8;
+  border-bottom:1px solid #e4ecdd;
+  font-size:11px;
+  color:#456;
+  text-align:center;
+}
+.panel-inline-head-slim .pih-cur{ font-weight:600; }
+.panel-inline-head-slim .pih-cur b{ color:#2b8a4c; font-size:13px; padding:0 2px; }
 
 /* ----- pane 切替 (画面モードごとの本体) ----- */
 .mode-pane{ display:none; }
@@ -2450,9 +2469,9 @@ body.is-score-pad-open .info-zone{ display:none !important; }
 
       <!-- ===== v85.4.6 Phase-3 : 入力パネルを スコアカード直下に埋め込み ===== -->
       <div class="panel-inline" id="panelInline">
-        <div class="panel-inline-head">
-          <div class="pi-hole"><span id="phInlineHoleNo">―</span><small>H</small></div>
-          <div class="pi-par">PAR<span id="phInlinePar">―</span></div>
+        <!-- v85.4.6 Phase-5 : ヘッダ削除 (現在H/PARはタブ後のH行で視覚化) -->
+        <div class="panel-inline-head panel-inline-head-slim">
+          <span class="pih-cur">現在: <b id="phInlineHoleNo">―</b>H  PAR <b id="phInlinePar">―</b></span>
         </div>
         <div class="panel-tabs panel-inline-tabs" data-bind="inputModeInline">
           <button data-val="simple" class="active">シンプル</button>
@@ -6063,13 +6082,53 @@ _bindSafe('orientation',     bindOrientation);
     $('#btnPanelConfirm').addEventListener('click', confirmPanel);
     /* v85.4.6 Phase-3 : インライン入力パネルの ✓確定ボタンも同じ confirmPanel() を呼ぶ */
     (function bindInlinePanelPhase3(){
+      /* v85.4.6 Phase-5 : インラインpanel は panel.hole 未セットでも動くよう、
+         入力前に自動で【自分 × 未入力の最初のホール】を currentHole に採用して開く */
+      function ensureInlinePanelReady(){
+        if (panel && panel.hole) return true;
+        try {
+          var s = Store.get();
+          if (!s.roundId) { startRound(); s = Store.get(); }
+          var me = (s.players||[]).find(function(p){ return p && p.type === 'me'; });
+          if (!me) return false;
+          var lim = Store.calc.holeCount();
+          var slot = (s.scores||{})[me.name] || { stroke:[] };
+          var nextNo = 1;
+          for (var i=0;i<lim;i++){
+            if (slot.stroke[i] == null) { nextNo = i + 1; break; }
+            if (i === lim - 1) nextNo = lim;
+          }
+          openPanelByHoleNo(me.name, nextNo, false);
+          return !!(panel && panel.hole);
+        } catch(e){ console.warn('ensureInlinePanelReady', e); return false; }
+      }
+      /* 現在H・PARヘッダの同期 */
+      function updateInlineHeader(){
+        try {
+          var el1 = document.getElementById('phInlineHoleNo');
+          var el2 = document.getElementById('phInlinePar');
+          if (panel && panel.hole) {
+            if (el1) el1.textContent = String(panel.hole.no);
+            if (el2) el2.textContent = String(panel.hole.par);
+          } else {
+            if (el1) el1.textContent = '―';
+            if (el2) el2.textContent = '―';
+          }
+        } catch(_){}
+      }
       var btnInline = document.getElementById('btnPanelConfirmInline');
-      if (btnInline) btnInline.addEventListener('click', function(e){ e.preventDefault(); confirmPanel(); });
+      if (btnInline) btnInline.addEventListener('click', function(e){
+        e.preventDefault();
+        if (!ensureInlinePanelReady()) { toast('プレイヤー情報がセットされてません', true); return; }
+        confirmPanel();
+        updateInlineHeader();
+      });
       /* Piボタン (シンプル) : インライン側も panel.stroke にセット */
       var inlinePane = document.querySelector('.pi-simple-inline');
       if (inlinePane){
         inlinePane.addEventListener('click', function(ev){
           var btn = ev.target.closest('.pi-btn'); if (!btn) return;
+          if (!ensureInlinePanelReady()) { toast('プレイヤー情報がセットされてません', true); return; }
           var delta = Number(btn.getAttribute('data-delta')||0);
           var hole = (panel && panel.hole) || null;
           var par = (hole && hole.par) || 4;
@@ -6078,19 +6137,26 @@ _bindSafe('orientation',     bindOrientation);
             inlinePane.querySelectorAll('.pi-btn').forEach(function(b){ b.classList.remove('active'); });
             btn.classList.add('active');
           } catch(_){}
+          updateInlineHeader();
         });
       }
       /* pp-btn-inline : インラインパットボタン */
       document.querySelectorAll('.pp-btn-inline').forEach(function(btn){
         btn.addEventListener('click', function(){
+          if (!ensureInlinePanelReady()) { toast('プレイヤー情報がセットされてません', true); return; }
           var p = Number(btn.getAttribute('data-putt')||0);
           panel.putt = p;
           document.querySelectorAll('.pp-btn-inline').forEach(function(b){ b.classList.remove('active'); });
           btn.classList.add('active');
           var cur = document.getElementById('ppCurInline');
           if (cur) cur.textContent = String(p);
+          updateInlineHeader();
         });
       });
+      /* バインド直後に一回ヘッダを仕込み (自動でcurrentHoleセットして見やすく) */
+      setTimeout(function(){
+        try { ensureInlinePanelReady(); updateInlineHeader(); } catch(_){}
+      }, 500);
       /* Simple/Counter タブ切替 (インライン) */
       var tabsInline = document.querySelector('.panel-inline-tabs');
       if (tabsInline){

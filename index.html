@@ -434,6 +434,15 @@ body.scr-register .bottom-nav{ display:none; }
   color:var(--c-text-sub);
   font-weight:600; margin-top:2px;
 }
+/* v85.4.6-final: スコアカード・ホール番号横の 🚻 トイレマーク (A案 横並び, α-1: wc:true のときだけ表示) */
+.card-table thead th .hole-wc{
+  display:inline-block;
+  font-size:13px;
+  color:#b27a00;
+  margin-left:2px;
+  vertical-align:middle;
+  line-height:1;
+}
 
 /* ★ 名前列 = 96px / 20px 太字 */
 .card-table th.player-name,
@@ -2475,25 +2484,7 @@ body.is-score-pad-open .info-zone{ display:none !important; }
       <header class="panel-head">
         <div class="ph-hole"><span id="phHoleNo">1</span><small>H</small></div>
         <div class="ph-par">PAR<span id="phPar">4</span></div>
-        <div class="ph-yard"><span id="phYard">352</span><small>YDS</small></div>
-        <div class="ph-wc" id="phWc" title="トイレあり">🚻</div>
       </header>
-
-      <!-- ② ストローク/パット + 累積PAR差 緑カード (名前は削除) -->
-      <section class="panel-row panel-row-v54">
-        <div class="pr-big">
-          <div class="pr-lbl">ストローク</div>
-          <div class="pr-val pr-val-xxl" id="prStroke">―</div>
-        </div>
-        <div class="pr-big">
-          <div class="pr-lbl">パット</div>
-          <div class="pr-val pr-val-xxl" id="prPutt">―</div>
-        </div>
-        <div class="pr-diff-card">
-          <div class="pr-diff-lbl">累積PAR差</div>
-          <div class="pr-diff-val" id="prDiff">E</div>
-        </div>
-      </section>
 
       <!-- ③ モード切替 (シンプル / カウンター) -->
       <div class="panel-tabs" data-bind="inputMode">
@@ -2548,18 +2539,11 @@ body.is-score-pad-open .info-zone{ display:none !important; }
 
     </div>
 
-    <!-- ⑥ ナビゲーション・ハンドルバー (前 / × / 次) -->
-    <div class="panel-navbar" id="panelNavbar">
-      <button class="pn-side pn-prev" id="pnPrev" aria-label="前のホール">
-        <span class="pn-arrow">←</span><span class="pn-txt">前</span>
-      </button>
-      <button class="pn-close" id="pnClose" aria-label="閉じる (バー化)">
-        <span class="pn-x">×</span>
-      </button>
-      <button class="pn-side pn-next" id="pnNext" aria-label="次のホール">
-        <span class="pn-txt">次</span><span class="pn-arrow">→</span>
-      </button>
-    </div>
+    <!-- v85.4.6-final: panel-navbar (前/×/次) 削除済み。
+         理由: 老眼ユーザー向け簡略化、ボタン数最小化。
+         代替: 過去のホール訂正はスコアカード側セルタップで対応 (既存機能、6150行付近)。
+         JSハンドラ (pnPrev/pnClose/pnNext, 5786-5788行) は要素無のため自然に発火しない。
+         btnPanelConfirm (✓確定) は完全に温存。 -->
 
     <!-- ⑦ 確定ボタン (常時固定表示) -->
     <button class="panel-confirm" id="btnPanelConfirm">✓ 確定</button>
@@ -6138,7 +6122,8 @@ _bindSafe('orientation',     bindOrientation);
       const h = COURSE.holes[i];
       cols.push({ kind:'hole', holeNo:h.no, par:h.par,
                   label:h.no + 'H',
-                  sub:(s.tee === 'ladies' ? h.ladiesYard : h.regYard) + 'y' });
+                  sub:(s.tee === 'ladies' ? h.ladiesYard : h.regYard) + 'y',
+                  wc: !!h.wc });
       if (i === 8 && lim >= 9) cols.push({ kind:'out', label:'OUT' });
       if (i === 17) cols.push({ kind:'in',  label:'IN' });
     }
@@ -6148,7 +6133,8 @@ _bindSafe('orientation',     bindOrientation);
     trH.innerHTML = '<th class="player-name">プレイヤー</th>' +
       cols.map(function(c){
         const cls = c.kind === 'out' ? 'cell-out' : c.kind === 'in' ? 'cell-in' : '';
-        return '<th class="' + cls + '">' + c.label + (c.sub ? '<small>'+c.sub+'</small>' : '') + '</th>';
+        const wcMark = (c.kind === 'hole' && c.wc) ? ' <span class="hole-wc" title="トイレあり">🚻</span>' : '';
+        return '<th class="' + cls + '">' + c.label + wcMark + (c.sub ? '<small>'+c.sub+'</small>' : '') + '</th>';
       }).join('') + '<th class="total-score">TOTAL</th>' ;
     dom.thead.replaceChildren(trH);
 

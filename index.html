@@ -567,18 +567,16 @@ body.scr-register .bottom-nav{ display:none; }
 .card-table tr.row-par  td.hole-active{ background:#ffedb0 !important; }
 
 /* v85.4.6 Phase-4 : PARセルをタップで編集可能に */
+/* v85.4.6 Phase-15 : PARセルの颙筆アイコンとタップ編集を完全撤去
+   （PARは規定値でユーザ変更不要／スコア修正は入力画面経由のみ）*/
 .card-table td.editable-par{
-  cursor:pointer;
+  cursor:default;
   position:relative;
 }
-.card-table td.editable-par:active{ background:#fff2c5; }
+.card-table td.editable-par:active{ background:transparent; }
 .card-table td.editable-par::after{
-  content:'✏';
-  position:absolute;
-  top:1px; right:2px;
-  font-size:9px;
-  color:#c9a600;
-  opacity:.6;
+  content:none !important;
+  display:none !important;
 }
 
 /* v85.4.6 Phase-4 : パット行 */
@@ -706,24 +704,18 @@ body.scr-register .bottom-nav{ display:none; }
    =============================================================== */
 
 /* ---------- フローティング 入力再開バー ---------- */
-.floating-bar{
-  position:fixed; left:0; right:0; bottom:0;
-  height:calc(54px + var(--safe-bottom));
-  padding-bottom:var(--safe-bottom);
-  background:linear-gradient(180deg,#fff 0%,#f0f7f3 100%);
-  border-top:2px solid var(--c-green-light);
-  box-shadow:0 -4px 16px rgba(0,0,0,.12);
-  z-index:55;
-  display:none;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  gap:2px;
-  font-weight:800; color:var(--c-green-dark);
-  font-size:var(--fs-md);
-  cursor:pointer;
+/* v85.4.6 Phase-15 : フローティング再開バナー完全削除 (どんな状況でも非表示) */
+.floating-bar,
+.floating-bar.show,
+#floatingBar,
+#floatingBar.show{
+  display:none !important;
+  visibility:hidden !important;
+  opacity:0 !important;
+  pointer-events:none !important;
+  height:0 !important;
+  overflow:hidden !important;
 }
-.floating-bar.show{ display:flex; }
 .floating-bar:active{ background:var(--c-green-light); }
 .fb-handle{
   width:48px; height:5px; background:var(--c-green);
@@ -1377,6 +1369,42 @@ body.scr-register .bottom-nav{ display:none; }
   padding:0 6px;
   visibility:visible !important;
   opacity:1 !important;
+}
+
+/* v85.4.6 Phase-15 : 横画面のときタブバーを太くしてタップしやすく */
+@media (orientation:landscape){
+  .card-modeswitch{
+    padding:6px 6px !important;
+    min-height:52px !important;
+  }
+  .card-modeswitch > .cms-btn{
+    min-height:44px !important;
+    max-height:52px !important;
+    font-size:15px !important;
+    padding:0 10px !important;
+    border-radius:10px !important;
+  }
+  .card-modeswitch > .cms-btn .cms-ico{
+    font-size:17px !important;
+  }
+  /* v85.4.6 Phase-15 : 横画面のスコア入力側スコアカードの縦幅を広げる */
+  body.scr-card #paneInput{
+    max-height:none !important;
+    height:auto !important;
+    overflow-y:auto !important;
+  }
+  body.scr-card #paneInput .score-card,
+  body.scr-card #paneInput .score-table,
+  body.scr-card #paneInput table{
+    max-height:none !important;
+    height:auto !important;
+  }
+  body.scr-card .card-mode-body,
+  body.scr-card #cardModeBody{
+    max-height:none !important;
+    height:auto !important;
+    min-height:calc(100vh - 60px) !important;
+  }
 }
 .cms-btn:active{ transform:scale(.96); }
 .cms-btn.is-active{ background:#2b8a4c; color:#fff; }
@@ -2225,6 +2253,17 @@ body.is-score-pad-open .info-zone{ display:none !important; }
 </style>
 </head>
 <body class="boot">
+<!-- v85.4.6 Phase-15 : PWA ハーム画面追加案内バナー -->
+<div id="p15PwaBanner" style="display:none;position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:9999;background:linear-gradient(135deg,#2b8a4c,#1f6a3a);color:#fff;padding:12px 14px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:13px;font-weight:600;line-height:1.5;">
+  <div style="display:flex;align-items:flex-start;gap:10px;">
+    <div style="font-size:22px;flex-shrink:0;line-height:1;">📱</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:14px;font-weight:800;margin-bottom:4px;">ホーム画面に追加でフル機能！</div>
+      <div id="p15PwaHint" style="font-size:12px;font-weight:500;opacity:.95;">ブラウザの共有ボタン <span style="font-size:14px;">⤴️</span> → 「ホーム画面に追加」</div>
+    </div>
+    <button id="p15PwaClose" style="background:rgba(255,255,255,.2);border:none;color:#fff;font-size:16px;font-weight:800;padding:4px 10px;border-radius:6px;cursor:pointer;flex-shrink:0;line-height:1;">×</button>
+  </div>
+</div>
 
 
   <!-- ============================================================
@@ -5959,6 +5998,45 @@ _bindSafe('orientation',     bindOrientation);
       setScreen('card');
       toast('ラウンドを開始しました');
       try { if (typeof window._hideGuestWaitingUi_ === 'function') window._hideGuestWaitingUi_(); } catch(_){}
+      /* v85.4.6 Phase-15 : ラウンド開始直後、panel.hole を即時に 1H にセット (1H first-shot バグ対策) 
+         + シンプル/カウンタータブの初回ハイライトを強制 */
+      try {
+        setTimeout(function(){
+          try {
+            var _s15 = Store.get();
+            var _me15 = (_s15.players||[]).find(function(p){ return p && p.type === 'me'; });
+            if (_me15) {
+              var _lim15 = Store.calc.holeCount();
+              var _slot15 = (_s15.scores||{})[_me15.name] || { stroke:[] };
+              var _nextNo15 = 1;
+              for (var _i15=0;_i15<_lim15;_i15++){
+                if (_slot15.stroke[_i15] == null) { _nextNo15 = _i15 + 1; break; }
+                if (_i15 === _lim15-1) _nextNo15 = _lim15;
+              }
+              var _hole15 = getHoleByNo(_nextNo15);
+              if (_hole15) {
+                panel.hole = _hole15;
+                panel.holeNo = _hole15.no;
+                panel.name = _me15.name;
+                console.log('[Phase-15 startRound] panel.hole 即時セット hole=' + _hole15.no);
+              }
+            }
+            /* シンプル/カウンタータブ 初回ハイライト強制 (data-val=simple を active に) */
+            document.querySelectorAll('.panel-tabs, .panel-inline-tabs').forEach(function(pt){
+              pt.querySelectorAll('button').forEach(function(b){
+                b.classList.toggle('active', b.getAttribute('data-val') === 'simple');
+              });
+            });
+            document.querySelectorAll('.pi-pane').forEach(function(p){
+              if (p.classList.contains('pi-simple') || p.classList.contains('pi-simple-inline')) {
+                p.classList.add('active');
+              } else if (p.classList.contains('pi-counter') || p.classList.contains('pi-counter-inline')) {
+                p.classList.remove('active');
+              }
+            });
+          } catch(e15){ console.warn('[Phase-15 startRound init]', e15); }
+        }, 100);
+      } catch(_){}
       /* v85.4.6-phase2.1 A案: 新規ラウンド開始成功後、自動でPRO入力画面を開く */
       try { if (typeof _p2AutoOpenInputPro === 'function') _p2AutoOpenInputPro(); } catch(_){}
       /* v72.2.1 : ホストがラウンド開始を押したとき、
@@ -6041,6 +6119,12 @@ _bindSafe('orientation',     bindOrientation);
 
     /* v71.2 : 同伴者行のクリックをロック。自分の行だけ入力可 */
     $('#cardTable').addEventListener('click', function(e){
+      /* v85.4.6 Phase-15 : PARセル・パットセルタップ編集を完全無効化
+         （PARは規定値・修正は入力画面経由のみ） */
+      const _tdParKill = e.target.closest('td.editable-par');
+      if (_tdParKill) { e.stopPropagation(); return; }
+      const _tdPuttKill = e.target.closest('td.editable-putt');
+      if (_tdPuttKill) { e.stopPropagation(); return; }
       /* v85.4.6 Phase-4 : PAR セルタップで PAR 編集 (prompt) */
       const tdPar = e.target.closest('td.editable-par');
       if (tdPar) {
@@ -6358,6 +6442,7 @@ _bindSafe('orientation',     bindOrientation);
         try { Phase12_bindLineShare(); } catch(_){}
         try { Phase12_bindPhoto(); } catch(_){}
       }, 50);
+      /* v85.4.6 Phase-15 : 800ms → 50ms に短縮 (1H first-shot バグ対策) */
       setTimeout(function(){
         try {
           if (panel && panel.hole) return; /* 既に開いてるなら skip */
@@ -6391,7 +6476,7 @@ _bindSafe('orientation',     bindOrientation);
             console.log('[Phase-9 init] hole='+hole99.no+' par='+hole99.par+' Pi数字強制更新完了');
           }
         } catch(e99){ console.warn('[Phase-9 init] err', e99); }
-      }, 800);
+      }, 50);
     })();
     $('#pnPrev').addEventListener('click', function(e){ e.stopPropagation(); moveHole(-1); });
     $('#pnNext').addEventListener('click', function(e){ e.stopPropagation(); moveHole(+1); });
@@ -9135,7 +9220,9 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
   console.log('[round-reset-bridge v85.4.5] ready');
 })();
 </script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous">
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<!-- v85.4.6 Phase-15 : 上のCloudFlare beacon script は閉じタグ抜けバグ修正済み。以下は Phase-2 スコア共有 JS -->
+<script>
 /* v85.4.6-phase2: 自分のスコア共有ハンドラ (個人情報保護: 自分のみ) */
 (function(){
   function _p2BuildShareUrl(){
@@ -9286,5 +9373,59 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
 
 
 </script>
+
+<!-- v85.4.6 Phase-15 : PWAバナー制御スクリプト -->
+<script>
+(function(){
+  try {
+    var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+                       (window.navigator && window.navigator.standalone === true);
+    if (isStandalone) return; /* PWA モードなら何もしない */
+    var LS_KEY = 'p15_pwa_banner_hide_until';
+    var hideUntil = 0;
+    try { hideUntil = parseInt(localStorage.getItem(LS_KEY) || '0', 10); } catch(_){}
+    if (hideUntil && Date.now() < hideUntil) return; /* 3日間拑制中 */
+    var ua = navigator.userAgent || '';
+    var isIOS = /iPhone|iPad|iPod/i.test(ua);
+    var isAndroid = /Android/i.test(ua);
+    setTimeout(function(){
+      var banner = document.getElementById('p15PwaBanner');
+      var hint = document.getElementById('p15PwaHint');
+      if (!banner) return;
+      if (isIOS) {
+        if (hint) hint.innerHTML = 'Safariの共有ボタン <span style="font-size:14px;">⤴️</span> → 「ホーム画面に追加」';
+      } else if (isAndroid) {
+        if (hint) hint.innerHTML = 'Chromeのメニュー ⋮ → 「ホーム画面に追加」';
+      }
+      banner.style.display = 'block';
+      var closeBtn = document.getElementById('p15PwaClose');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', function(e){
+          e.stopPropagation();
+          banner.style.display = 'none';
+          try { localStorage.setItem(LS_KEY, String(Date.now() + 3*24*60*60*1000)); } catch(_){}
+        });
+      }
+    }, 3000); /* 3秒後に表示（ロード直後のノイズを避ける）*/
+  } catch(e){ console.warn('[Phase-15 PWA banner]', e); }
+})();
+</script>
+
+<!-- v85.4.6 Phase-15 : ブラウザ対応・全体レイアウト少し圧縮 -->
+<style>
+@supports (padding: env(safe-area-inset-bottom)) {
+  body { padding-bottom: env(safe-area-inset-bottom); }
+}
+/* 非標準ブラウザアドレスバー対策 */
+html, body {
+  min-height: 100vh;
+  min-height: 100svh; /* small viewport height */
+  overflow-x: hidden;
+}
+/* ブラウザで見たときのボトムナビがアドレスバーに隠れないように safe-area 尊重 */
+.bottom-nav {
+  padding-bottom: max(6px, env(safe-area-inset-bottom, 6px)) !important;
+}
+</style>
 </body>
 </html>

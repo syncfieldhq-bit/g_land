@@ -5214,14 +5214,18 @@ _bindSafe('orientation',     bindOrientation);
     _safeBind('#btnRefreshBoard',   'click', function(){
       try { if (typeof renderBoard === 'function') renderBoard(); } catch(_){ }
     });
-    // v85.4.6-phase1b : PROボタンは「スコア入力」として機能する(準備中ロックを解除)
+    // v85.4.6-phase2.2: 「スコア入力」タブは inputPro に飛ばす (バグ修正)
     _safeBind('#btnSwitchToInputPro','click', function(){
       try {
-        activatePane('input');
+        activatePane('inputPro');
         if (typeof __v85_3_5_rerenderCardForMode === 'function') {
-          __v85_3_5_rerenderCardForMode('input');
+          __v85_3_5_rerenderCardForMode('inputPro');
         }
-      } catch(_) {}
+        /* A案: watchdog で is-active 維持 */
+        if (typeof window._p2KeepProActive === 'function') {
+          window._p2KeepProActive(3);
+        }
+      } catch(e) { console.warn('[p2.2] switch to inputPro fail:', e); }
     });
     /* v85.4.6-phase2.1 A案: paneInputPro は自動起動対象。以下の無効化ロジックは維持 */
     /* v85.3.6 : PRO 内ボタンは到達しないが念のため無効化 (paneInputPro は表示されない)
@@ -5763,7 +5767,13 @@ _bindSafe('orientation',     bindOrientation);
       const c = e.target.closest('.home-card[data-nav]');
       if (!c || c.classList.contains('disabled')) return;
       const nav = c.getAttribute('data-nav');
-      if (nav === 'gworld') setScreen(Store.get().roundId ? 'card' : 'prep');
+      if (nav === 'gworld') {
+        setScreen(Store.get().roundId ? 'card' : 'prep');
+        /* v85.4.6-phase2.2: G-WORLD からラウンド継続時も PRO 自動起動 */
+        if (Store.get().roundId) {
+          try { if (typeof _p2AutoOpenInputPro === 'function') _p2AutoOpenInputPro(); } catch(_){}
+        }
+      }
       else setScreen(nav);
     });
   }
@@ -8292,8 +8302,43 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
   window._p2AutoOpenInputPro = function(){
     /* screen-card が可視状態になってから発動させる */
     setTimeout(_switchToPro, 60);
-    setTimeout(_switchToPro, 300);  /* 二段掛けで確実に */
+    setTimeout(_switchToPro, 300);
+    setTimeout(_switchToPro, 800);   /* v85.4.6-phase2.2: 三段掛けで再描画にも勝つ */
+    if (typeof window._p2KeepProActive === 'function') {
+      window._p2KeepProActive(3);
+    }
   };
+  /* v85.4.6-phase2.2: watchdog機構 — 再描画で is-active が剥がれても自動復元 */
+  window._p2KeepProActive = function(seconds){
+    var sec = (typeof seconds === 'number' && seconds > 0) ? seconds : 3;
+    var startTs = Date.now();
+    var timer = setInterval(function(){
+      var elapsed = (Date.now() - startTs) / 1000;
+      if (elapsed >= sec) { clearInterval(timer); return; }
+      var pane = document.getElementById('paneInputPro');
+      if (pane && !pane.classList.contains('is-active')){
+        console.log('[p2.2] watchdog: re-applying is-active');
+        _switchToPro();
+      }
+    }, 200);
+  };
+  /* v85.4.6-phase2.2: ページロード時、既にラウンド中ならPRO自動起動 */
+  function _p2CheckLoadRound(){
+    try {
+      var s = (typeof Store !== 'undefined' && Store.get) ? Store.get() : {};
+      var screenCard = document.getElementById('screen-card');
+      /* screen-card が既に可視 & ラウンド中 → PRO 起動 */
+      if (screenCard && s.roundId && screenCard.classList.contains('is-active')) {
+        console.log('[p2.2] round already active on load, opening PRO');
+        window._p2AutoOpenInputPro();
+      }
+    } catch(e){ console.warn('[p2.2] load check fail:', e); }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(_p2CheckLoadRound, 800); });
+  } else {
+    setTimeout(_p2CheckLoadRound, 800);
+  }
 })();
 
 

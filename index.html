@@ -1387,23 +1387,39 @@ body.scr-register .bottom-nav{ display:none; }
   .card-modeswitch > .cms-btn .cms-ico{
     font-size:17px !important;
   }
-  /* v85.4.6 Phase-15 : 横画面のスコア入力側スコアカードの縦幅を広げる */
+  /* v85.4.6 Phase-15c : 横画面スコア入力カードの下端切れ完全解消 */
   body.scr-card #paneInput{
     max-height:none !important;
     height:auto !important;
     overflow-y:auto !important;
+    padding-bottom: calc(env(safe-area-inset-bottom, 16px) + 20px) !important;
+    box-sizing: border-box !important;
   }
   body.scr-card #paneInput .score-card,
   body.scr-card #paneInput .score-table,
-  body.scr-card #paneInput table{
+  body.scr-card #paneInput table,
+  body.scr-card #paneInput .card-table{
     max-height:none !important;
     height:auto !important;
+    margin-bottom: calc(env(safe-area-inset-bottom, 8px) + 16px) !important;
   }
   body.scr-card .card-mode-body,
   body.scr-card #cardModeBody{
     max-height:none !important;
     height:auto !important;
-    min-height:calc(100vh - 60px) !important;
+    min-height:100svh !important;
+    padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 24px) !important;
+    overflow-y:auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  /* パット行の最下端だけマージンを強めに見えない行をバファー化 */
+  body.scr-card .card-table tbody tr:last-child td{
+    padding-bottom: calc(env(safe-area-inset-bottom, 12px) + 8px) !important;
+  }
+  /* screen-card 自体の下に余白を作る */
+  body.scr-card #screen-card{
+    padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 20px) !important;
+    min-height: 100svh !important;
   }
 }
 .cms-btn:active{ transform:scale(.96); }
@@ -3535,11 +3551,18 @@ window.escapeHtml = function(s){
   }
   function loadLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'{}')||{}; } catch(_){ return {}; } }
   function saveLS(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(State)); } catch(_){} }
+  /* v85.4.6 Phase-15b : 登録完了永続フラグ (PWA standalone 再起動で初期登録画面に戻らないための二重化) */
+  var P15_REG_KEY = 'gworld_p15_registered_done';
+  function p15IsRegistered(){ try { return localStorage.getItem(P15_REG_KEY) === '1'; } catch(_){ return false; } }
+  function p15MarkRegistered(){ try { localStorage.setItem(P15_REG_KEY, '1'); } catch(_){} }
+  function p15ClearRegistered(){ try { localStorage.removeItem(P15_REG_KEY); } catch(_){} }
   function loadPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY)||'[]')||[]; } catch(_){ return []; } }
   function savePending(q){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(q)); } catch(_){} }
 
   const State = Object.assign(defaultState(), loadLS());
   if (['weather','number'].indexOf(State.inputMode) >= 0) State.inputMode = 'simple';
+  /* v85.4.6 Phase-15b : LS の userId を見て 永続フラグを同期 (Safety Net) */
+  if (State.userId && State.userId !== '(pending)') { try { p15MarkRegistered(); } catch(_){} }
   if (State.inputMode !== 'simple' && State.inputMode !== 'counter') State.inputMode = 'simple';
   if (!State.userId && State.roundId) {
     State.roundId = '';
@@ -4052,6 +4075,14 @@ window.escapeHtml = function(s){
     State.joinPending = false;
     saveLS();
     Store._notify(['joinMode','joinPending']);
+    /* v85.4.6 Phase-15b : 登録完了永続フラグ or State.userId があれば register に飛ばさない */
+    try {
+      if (typeof p15IsRegistered === 'function' && (p15IsRegistered() || State.userId)) {
+        try { if (typeof setScreen === 'function') setScreen(State.roundId ? 'card' : 'home'); } catch(_){}
+        Store.stopJoinWatcher();
+        return;
+      }
+    } catch(_){}
     if (typeof setScreen === 'function') {
       try { setScreen('register'); } catch(_){}
     }
@@ -4857,18 +4888,24 @@ window.escapeHtml = function(s){
     return false;
   }
 
-  document.addEventListener('DOMContentLoaded', function(){
+    document.addEventListener('DOMContentLoaded', function(){
     try {
       document.body.classList.remove('boot');
       const stored = (function(){
         try { return JSON.parse(localStorage.getItem('gworld_v52_state')||'{}')||{}; }
         catch(_) { return {}; }
       })();
-      const initialScreen = stored.userId ? 'home' : 'register';
+      /* v85.4.6 Phase-15b : localStorage の永続フラグ gworld_p15_registered_done='1' があれば
+         userId 復元途中でも初期画面をホームにする (PWA standalone 起動対策) */
+      let _p15RegDone = false;
+      try { _p15RegDone = localStorage.getItem('gworld_p15_registered_done') === '1'; } catch(_){}
+      const initialScreen = (_p15RegDone || stored.userId) ? 'home' : 'register';
       document.body.classList.add('scr-' + initialScreen);
     } catch(_) {
+      let _p15Fallback = false;
+      try { _p15Fallback = localStorage.getItem('gworld_p15_registered_done') === '1'; } catch(_){}
       document.body.classList.remove('boot');
-      document.body.classList.add('scr-register');
+      document.body.classList.add(_p15Fallback ? 'scr-home' : 'scr-register');
     }
 
     try { initPanel(); } catch(e){ console.warn('initPanel failed', e); }
@@ -5471,18 +5508,16 @@ _bindSafe('orientation',     bindOrientation);
     _safeBind('#btnRefreshBoard',   'click', function(){
       try { if (typeof renderBoard === 'function') renderBoard(); } catch(_){ }
     });
-    // v85.4.6-phase2.2: 「スコア入力」タブは inputPro に飛ばす (バグ修正)
+    // v85.4.6 Phase-15c : 「スコア入力」タブは通常の input ペイン (paneInput) へ直行させる
+    // PRO画面 (paneInputPro) はユーザの要望で完全封鎖
     _safeBind('#btnSwitchToInputPro','click', function(){
       try {
-        activatePane('inputPro');
+        activatePane('input');
         if (typeof __v85_3_5_rerenderCardForMode === 'function') {
-          __v85_3_5_rerenderCardForMode('inputPro');
+          __v85_3_5_rerenderCardForMode('input');
         }
-        /* A案: watchdog で is-active 維持 */
-        if (typeof window._p2KeepProActive === 'function') {
-          window._p2KeepProActive(3);
-        }
-      } catch(e) { console.warn('[p2.2] switch to inputPro fail:', e); }
+        console.log('[Phase-15c] btnSwitchToInputPro → paneInput にリダイレクト');
+      } catch(e) { console.warn('[Phase-15c] switch to input fail:', e); }
     });
     /* v85.4.6-phase2.1 A案: paneInputPro は自動起動対象。以下の無効化ロジックは維持 */
     /* v85.3.6 : PRO 内ボタンは到達しないが念のため無効化 (paneInputPro は表示されない)
@@ -6579,6 +6614,8 @@ _bindSafe('orientation',     bindOrientation);
     $('#btnMyReset').addEventListener('click', function(){
       if (!confirm('ローカルデータを全消去してよろしいですか？')) return;
       localStorage.clear();
+      /* v85.4.6 Phase-15b : リセット時は永続フラグも消す */
+      try { if (typeof p15ClearRegistered === 'function') p15ClearRegistered(); } catch(_){}
       location.reload();
     });
   }
@@ -7416,11 +7453,18 @@ _bindSafe('orientation',     bindOrientation);
           panel.modify = false;
           try { $('#floatingBar').classList.remove('show'); } catch(_){}
           openPanelByHoleNo(name, nextUn12, false);
+          /* v85.4.6 Phase-15c : 修正確定後もパット=0 強制 (全経路) */
           try {
-            document.querySelectorAll('.pi-btn.active').forEach(function(b){ b.classList.remove('active'); });
-            document.querySelectorAll('.pp-btn-inline.active').forEach(function(b){ b.classList.remove('active'); });
-            var ppc12m = document.getElementById('ppCurInline'); if (ppc12m) ppc12m.textContent = '0';
             panel.putt = 0;
+            var _ppcM_15c = document.getElementById('ppCurInline');
+            if (_ppcM_15c) _ppcM_15c.textContent = '0';
+            var _ppcM2_15c = document.getElementById('ppCur');
+            if (_ppcM2_15c) _ppcM2_15c.textContent = '0';
+            document.querySelectorAll('.pi-btn.active').forEach(function(b){ b.classList.remove('active'); });
+            document.querySelectorAll('.pp-btn.active, .pp-btn-inline.active').forEach(function(b){ b.classList.remove('active'); });
+            document.querySelectorAll('.pp-btn[data-putt="0"], .pp-btn-inline[data-putt="0"]').forEach(function(b){ b.classList.add('active'); });
+            try { renderPanel(); } catch(_){}
+            try { if (typeof updateInlineHeader === 'function') updateInlineHeader(); } catch(_){}
           } catch(_){}
           toast(holeNo + 'H 修正保存 → ' + nextUn12 + 'H へ');
         } else {
@@ -7436,13 +7480,23 @@ _bindSafe('orientation',     bindOrientation);
       }
     } else if (holeNo < lim) {
       openPanelByHoleNo(name, holeNo + 1, false);
-      /* Pi/Putt ボタンの active をリセット */
+      /* v85.4.6 Phase-15c : 全ホールで確定後はパット=0 スタート (2H以降でも確実にリセット)
+         openPanelByHoleNo() 内で pl[idx0] の既存値がロードされるのを強制上書き */
       try {
-        document.querySelectorAll('.pi-btn.active').forEach(function(b){ b.classList.remove('active'); });
-        document.querySelectorAll('.pp-btn-inline.active').forEach(function(b){ b.classList.remove('active'); });
-        var ppc = document.getElementById('ppCurInline'); if (ppc) ppc.textContent = '0';
         panel.putt = 0;
-      } catch(_){}
+        var _ppcAll_15c = document.getElementById('ppCurInline');
+        if (_ppcAll_15c) _ppcAll_15c.textContent = '0';
+        var _ppcMain_15c = document.getElementById('ppCur');
+        if (_ppcMain_15c) _ppcMain_15c.textContent = '0';
+        document.querySelectorAll('.pi-btn.active').forEach(function(b){ b.classList.remove('active'); });
+        document.querySelectorAll('.pi-btn-inline.active, .pp-btn.active, .pp-btn-inline.active').forEach(function(b){ b.classList.remove('active'); });
+        /* 0ボタンに active を付け直す */
+        document.querySelectorAll('.pp-btn[data-putt="0"], .pp-btn-inline[data-putt="0"]').forEach(function(b){ b.classList.add('active'); });
+        /* renderPanel() を明示コールして確実に反映 */
+        try { renderPanel(); } catch(_){}
+        try { if (typeof updateInlineHeader === 'function') updateInlineHeader(); } catch(_){}
+        console.log('[Phase-15c] パット 0 リセット完了 next hole=' + (holeNo+1));
+      } catch(e15c){ console.warn('[Phase-15c putt reset]', e15c); }
     } else {
       minimizePanel();
       toast('全ホール入力完了！お疲れさまでした');
@@ -9328,46 +9382,18 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
       console.warn('[p2.1] switchToPro fail:', e);
     }
   }
-  /* setScreen('card') 直後に DOM が確実に居るとは限らんので少し遅延 */
+  /* v85.4.6 Phase-15c : PRO入力画面 (paneInputPro) の自動オープンを完全に止める
+     ユーザの要望: 「ホーム → G-WORLD → ラウンド開始」で PRO 画面が割り込むのを削除。
+     直接スコア入力画面へ直行させる。_p2AutoOpenInputPro / _p2KeepProActive / _p2CheckLoadRound を全部 no-op化 */
   window._p2AutoOpenInputPro = function(){
-    /* screen-card が可視状態になってから発動させる */
-    setTimeout(_switchToPro, 60);
-    setTimeout(_switchToPro, 300);
-    setTimeout(_switchToPro, 800);   /* v85.4.6-phase2.2: 三段掛けで再描画にも勝つ */
-    if (typeof window._p2KeepProActive === 'function') {
-      window._p2KeepProActive(3);
-    }
+    /* Phase-15c : 完全無効化 - PRO 画面を自動で開かない */
+    console.log('[Phase-15c] _p2AutoOpenInputPro は無効化されました');
   };
-  /* v85.4.6-phase2.2: watchdog機構 — 再描画で is-active が剥がれても自動復元 */
-  window._p2KeepProActive = function(seconds){
-    var sec = (typeof seconds === 'number' && seconds > 0) ? seconds : 3;
-    var startTs = Date.now();
-    var timer = setInterval(function(){
-      var elapsed = (Date.now() - startTs) / 1000;
-      if (elapsed >= sec) { clearInterval(timer); return; }
-      var pane = document.getElementById('paneInputPro');
-      if (pane && !pane.classList.contains('is-active')){
-        console.log('[p2.2] watchdog: re-applying is-active');
-        _switchToPro();
-      }
-    }, 200);
+  window._p2KeepProActive = function(){
+    /* Phase-15c : 完全無効化 */
   };
-  /* v85.4.6-phase2.2: ページロード時、既にラウンド中ならPRO自動起動 */
   function _p2CheckLoadRound(){
-    try {
-      var s = (typeof Store !== 'undefined' && Store.get) ? Store.get() : {};
-      var screenCard = document.getElementById('screen-card');
-      /* screen-card が既に可視 & ラウンド中 → PRO 起動 */
-      if (screenCard && s.roundId && screenCard.classList.contains('is-active')) {
-        console.log('[p2.2] round already active on load, opening PRO');
-        window._p2AutoOpenInputPro();
-      }
-    } catch(e){ console.warn('[p2.2] load check fail:', e); }
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function(){ setTimeout(_p2CheckLoadRound, 800); });
-  } else {
-    setTimeout(_p2CheckLoadRound, 800);
+    /* Phase-15c : ロード時に PRO 自動開きもしない */
   }
 })();
 

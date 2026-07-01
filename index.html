@@ -2155,7 +2155,14 @@ body.is-score-pad-open .info-zone{ display:none !important; }
 
   
 /* v85.4.6-phase2: LINE共有ボタン (自分のスコアのみ共有) */
-.p2-line-share-zone{
+/* v85.4.6 Phase-13 : 上ツールバーと重複するため 強制非表示 */
+.p2-line-share-zone,
+#p2LineShareZone,
+.p2-btn-line-share,
+#btnP2ShareMyScore{
+  display:none !important;
+}
+.p2-line-share-zone-DEPRECATED{
   display:flex;
   justify-content:center;
   padding:8px 12px 12px;
@@ -2199,7 +2206,11 @@ body.is-score-pad-open .info-zone{ display:none !important; }
        ============================================================ -->
   <script>
   (function(){
-    var SCREENS = ['register','home','prep','card','compete','mypage'];
+    /* v85.4.6 Phase-13 : SCREENS 拡張 - history / history-detail を追加
+       これがないと navigateToHistory() で scr-history をセットしても、
+       他画面 (home/mypage/compete/card) に切り替え時に scr-history が残り、
+       #screen-history が全ページのフッター直下に常に表示される不具合が発生。 */
+    var SCREENS = ['register','home','prep','card','compete','mypage','history','history-detail'];
     function setScreen(name){
       if (SCREENS.indexOf(name) < 0) name = 'home';
       var body = document.body; if (!body) return;
@@ -2536,13 +2547,9 @@ body.is-score-pad-open .info-zone{ display:none !important; }
         <button class="panel-confirm" id="btnPanelConfirmInline">✓ 確定</button>
       </div>
 
-      <!-- v85.4.6 Phase-3 : LINE共有 は入力パネル直下に配置 -->
-      <div class="p2-line-share-zone" id="p2LineShareZone">
-        <button type="button" class="p2-btn-line-share" id="btnP2ShareMyScore" title="自分のスコアをLINEで共有">
-          <span class="p2-line-ico">📨</span>
-          <span class="p2-line-lbl">自分のスコアをLINEで共有</span>
-        </button>
-      </div>
+      <!-- v85.4.6 Phase-13 : 下部LINE共有ボタン削除 (上ツールバー btnLineShareTop と重複していたため)
+           以前の Phase-3 で追加した p2-line-share-zone は上ツールバーLINE共有と機能重複していた -->
+      <!-- <div class="p2-line-share-zone" id="p2LineShareZone" style="display:none"></div> -->
       <!-- v85.4.6-phase1: infoZone(広告/告知/写真UP/ｺﾋﾟｰ/LINE) 削除済 → Phase-2で保存モーダル内に再配置予定 -->
     </div>
 
@@ -4839,6 +4846,9 @@ window.escapeHtml = function(s){
     if (SCREENS.indexOf(name) < 0) name = 'home';
     document.body.classList.remove('boot');
     SCREENS.forEach(function(s){ document.body.classList.remove('scr-' + s); });
+    /* v85.4.6 Phase-13 : setScreen 系でも history/history-detail の残留クラスを明示除去 */
+    document.body.classList.remove('scr-history');
+    document.body.classList.remove('scr-history-detail');
     document.body.classList.add('scr-' + name);
     $$('#bottomNav button').forEach(function(b){
       GWDom.setClass(b, 'active', b.getAttribute('data-nav') === name);
@@ -7063,9 +7073,14 @@ _bindSafe('orientation',     bindOrientation);
     inputPanelEl.classList.remove('open');
     inputPanelEl.setAttribute('aria-hidden','true');
     $('#panelMask').classList.remove('show');
-    if (panel.open && panel.hole) {
+    /* v85.4.6 Phase-13 : 修正確定後は再開バナー不要 (Phase-12で次ホール自動遷移するため)
+       - panel.modify が真の場合 = 修正フロー = 再開バナー隠す
+       - 通常の一時中断 (パネル閉じただけ) の場合のみバナー表示 */
+    if (panel.open && panel.hole && !panel.modify) {
       GWDom.setText($('#fbHoleLabel'), panel.hole.no + 'H (' + panel.name + ')');
       $('#floatingBar').classList.add('show');
+    } else {
+      $('#floatingBar').classList.remove('show');
     }
   }
 
@@ -7241,6 +7256,10 @@ _bindSafe('orientation',     bindOrientation);
           if (slot12m.stroke[i12m] == null) { nextUn12 = i12m + 1; break; }
         }
         if (nextUn12 > 0) {
+          /* v85.4.6 Phase-13 : 修正確定後は再開バナー消して次ホール開く
+             (「10H (佐藤) の入力を再開」の不要通知を出さないため modify=false でオープン) */
+          panel.modify = false;
+          try { $('#floatingBar').classList.remove('show'); } catch(_){}
           openPanelByHoleNo(name, nextUn12, false);
           try {
             document.querySelectorAll('.pi-btn.active').forEach(function(b){ b.classList.remove('active'); });
@@ -7248,8 +7267,11 @@ _bindSafe('orientation',     bindOrientation);
             var ppc12m = document.getElementById('ppCurInline'); if (ppc12m) ppc12m.textContent = '0';
             panel.putt = 0;
           } catch(_){}
-          toast(holeNo + 'H 修正保存 → ' + nextUn12 + 'H へ戻りました');
+          toast(holeNo + 'H 修正保存 → ' + nextUn12 + 'H へ');
         } else {
+          /* v85.4.6 Phase-13 : 全ホール入力済み時の修正確定でも再開バナーは出さない */
+          panel.modify = false;
+          try { $('#floatingBar').classList.remove('show'); } catch(_){}
           minimizePanel();
           toast(holeNo + 'H 修正保存しました (全ホール入力済)');
         }
@@ -8449,12 +8471,23 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
     window.scrollTo(0, 0);
   }
   function navigateBack(toMy){
-    document.body.className = (document.body.className || '').split(' ').filter(function(c){
-      return !c.startsWith('scr-');
-    }).join(' ') + (toMy ? ' scr-mypage' : ' scr-home');
+    /* v85.4.6 Phase-13 : 戻る時は setScreen を使って scr-history / scr-history-detail を
+       確実に除去する (直接 className 代入だと SCREENS リスト外のクラスも残るリスク) */
+    var target = toMy ? 'mypage' : 'home';
+    if (typeof window.gwSetScreen === 'function') {
+      try { window.gwSetScreen(target); } catch(e){
+        document.body.className = (document.body.className || '').split(' ').filter(function(c){
+          return !c.startsWith('scr-');
+        }).join(' ') + ' scr-' + target;
+      }
+    } else {
+      document.body.className = (document.body.className || '').split(' ').filter(function(c){
+        return !c.startsWith('scr-');
+      }).join(' ') + ' scr-' + target;
+    }
     if (toMy){
       // myHistory も再描画
-      renderMyHistoryMini();
+      try { renderMyHistoryMini(); } catch(_){}
     }
   }
   document.addEventListener('click', function(e){

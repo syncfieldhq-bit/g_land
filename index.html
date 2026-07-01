@@ -1729,7 +1729,9 @@ button, .dash-cell, .card-side-close, .card-side-qr,
    ② PRO→スコア入力 のラベル系
    ============================================================ */
 /* ② 「自分入力」ボタンは非表示。is-active 等のJS制御は維持。 */
-#btnSwitchToInput{ display:none !important; }
+/* v85.4.6 Phase-12 : スコア入力タブを復活させる (組表示から戻れんバグ対策) */
+/* #btnSwitchToInput{ display:none !important; } */  /* ← Phase-12でコメントアウト */
+#btnSwitchToInput{ display:flex !important; }
 /* PRO の準備中バッジは Phase-1 で外す */
 #btnSwitchToInputPro .cms-cs-badge{ display:none !important; }
 #btnSwitchToInputPro.is-coming-soon{ opacity:1 !important; }
@@ -5293,9 +5295,8 @@ _bindSafe('orientation',     bindOrientation);
                         ? Number(window.HOLE_PAR_MAP[h]) : 4;
           var _v86Html = _v86FormatBoardCell(v, _v86Par, _v86Mode);
           /* v85.4.6-phase2: パット数を小さく併記 (老眼配慮で見やすい黄色寄せ) */
-          var _puttOut = (sc.putt != null && sc.putt !== '') ? Number(sc.putt) : null;
-          var _puttHtmlOut = (_puttOut != null && !isNaN(_puttOut))
-                             ? ('<small class="bt-putt">Pt' + _puttOut + '</small>') : '';
+          /* v85.4.6 Phase-12 : 組表示ではPt表記を出さない (ユーザー要望) */
+          var _puttHtmlOut = '';
           bodyHtml += '<td class="bt-cell bt-filled">' + _v86Html + _puttHtmlOut + '</td>';
         } else {
           bodyHtml += '<td class="bt-cell bt-empty">―</td>';
@@ -5315,9 +5316,8 @@ _bindSafe('orientation',     bindOrientation);
                            ? Number(window.HOLE_PAR_MAP[h2]) : 4;
             var _v86Html2 = _v86FormatBoardCell(v2, _v86Par2, _v86Mode);
             /* v85.4.6-phase2: パット数を小さく併記 */
-            var _puttIn = (sc2.putt != null && sc2.putt !== '') ? Number(sc2.putt) : null;
-            var _puttHtmlIn = (_puttIn != null && !isNaN(_puttIn))
-                              ? ('<small class="bt-putt">Pt' + _puttIn + '</small>') : '';
+            /* v85.4.6 Phase-12 : 組表示ではPt表記を出さない (ユーザー要望) */
+            var _puttHtmlIn = '';
             bodyHtml += '<td class="bt-cell bt-filled">' + _v86Html2 + _puttHtmlIn + '</td>';
           } else {
             bodyHtml += '<td class="bt-cell bt-empty">―</td>';
@@ -6275,6 +6275,10 @@ _bindSafe('orientation',     bindOrientation);
       }
       /* v85.4.6 Phase-9 : パネルバインド完了後、自動で自分の次未入力ホールを openPanelByHoleNo して Pi 数字を初期化 */
       setTimeout(function(){
+        try { Phase12_bindLineShare(); } catch(_){}
+        try { Phase12_bindPhoto(); } catch(_){}
+      }, 50);
+      setTimeout(function(){
         try {
           if (panel && panel.hole) return; /* 既に開いてるなら skip */
           var s99 = Store.get();
@@ -6436,6 +6440,38 @@ _bindSafe('orientation',     bindOrientation);
     renderMyPage(s);
     syncSegments(s);
     if (panel.open) renderPanel();
+    /* v85.4.6 Phase-12 : renderAll後、必ず現在ホール列をハイライト＆Pi数字を強制初期化 */
+    try {
+      var _s12 = s || (Store && Store.get && Store.get()) || {};
+      var _curNo12 = _s12.currentHole || 1;
+      /* ハイライト */
+      if (typeof _highlightActiveHole === 'function') _highlightActiveHole(_curNo12);
+      /* Pi数字更新 */
+      var _hole12 = (typeof getHoleByNo === 'function') ? getHoleByNo(_curNo12) : null;
+      if (_hole12) {
+        var _par12 = _hole12.par || 4;
+        for (var _d12=-2; _d12<=2; _d12++) {
+          var _e12 = document.getElementById('psi' + (_d12>=0 ? _d12 : '-'+Math.abs(_d12)));
+          if (_e12) {
+            var _v12 = _par12 + _d12;
+            if (_v12 < 1) _v12 = 1;
+            if (_v12 > 9) _v12 = 9;
+            _e12.textContent = String(_v12);
+          }
+        }
+        /* ヘッダ更新 */
+        var _elN12 = document.getElementById('phInlineHoleNo'); if (_elN12) _elN12.textContent = String(_hole12.no);
+        var _elP12 = document.getElementById('phInlinePar');    if (_elP12) _elP12.textContent = String(_hole12.par);
+        /* panel.hole が未セットならセット (フルオープンはしない) */
+        if (panel && !panel.hole) {
+          panel.hole = _hole12;
+          panel.holeNo = _hole12.no;
+          var _s12b = s || Store.get();
+          var _me12 = (_s12b.players||[]).find(function(p){ return p && p.type === 'me'; });
+          if (_me12) panel.name = _me12.name;
+        }
+      }
+    } catch(e12x){ console.warn('[Phase-12 renderAll init]', e12x); }
   }
 
   function syncSegments(s){
@@ -7193,11 +7229,34 @@ _bindSafe('orientation',     bindOrientation);
     }
 
     if (isModify) {
-      /* v85.4.6 Phase-11 : 修正確定 → フローティングバー出して「元の位置に戻れる」状態にする。
-         ユーザーがフローティングバー or 元ホールセルをタップしたら、また openPanelByHoleNo(name, holeNo, true) で戻る */
+      /* v85.4.6 Phase-12 : 修正確定も、入力確定と同じやうに「次の未入力ホール」に自動遷移。
+         (Phase-11の「minimizePanelで止まる」仕様はユーザー不満の原因・元の入力後ロジックに復帰) */
       setLastGuideHole(holeNo);
-      minimizePanel();
-      toast(holeNo + 'H 修正保存 しました (?'+holeNo+'H タップで戻り)');
+      try {
+        /* 自分の次未入力ホールを探す — なければ minimize */
+        var s12m = Store.get();
+        var slot12m = (s12m.scores||{})[name] || { stroke:[] };
+        var nextUn12 = -1;
+        for (var i12m=0; i12m<lim; i12m++){
+          if (slot12m.stroke[i12m] == null) { nextUn12 = i12m + 1; break; }
+        }
+        if (nextUn12 > 0) {
+          openPanelByHoleNo(name, nextUn12, false);
+          try {
+            document.querySelectorAll('.pi-btn.active').forEach(function(b){ b.classList.remove('active'); });
+            document.querySelectorAll('.pp-btn-inline.active').forEach(function(b){ b.classList.remove('active'); });
+            var ppc12m = document.getElementById('ppCurInline'); if (ppc12m) ppc12m.textContent = '0';
+            panel.putt = 0;
+          } catch(_){}
+          toast(holeNo + 'H 修正保存 → ' + nextUn12 + 'H へ戻りました');
+        } else {
+          minimizePanel();
+          toast(holeNo + 'H 修正保存しました (全ホール入力済)');
+        }
+      } catch(e12m){
+        console.warn('[Phase-12 modify next]', e12m);
+        minimizePanel();
+      }
     } else if (holeNo < lim) {
       openPanelByHoleNo(name, holeNo + 1, false);
       /* Pi/Putt ボタンの active をリセット */
@@ -7241,6 +7300,75 @@ _bindSafe('orientation',     bindOrientation);
       }
     });
   }
+
+  /* v85.4.6 Phase-12 : LINE共有ボタン (btnLineShareTop) の click ハンドラ追加。
+     未バインドだったので押しても無反応やった。招待URL生成→LINEスキーム起動 */
+  const Phase12_bindLineShare = function(){
+    const _btn = document.getElementById('btnLineShareTop');
+    if (!_btn) return;
+    _btn.addEventListener('click', function(ev){
+      ev.preventDefault();
+      try {
+        const s = (typeof Store !== 'undefined' && Store.get) ? Store.get() : {};
+        if (!s.roundId || !s.groupId) {
+          toast('先に「ラウンド開始」を押してください', true);
+          return;
+        }
+        const base = location.origin + location.pathname;
+        const url = base + '?join=' + encodeURIComponent(s.groupId) + '&t=' + Date.now();
+        const msg = '回よろしく！\n' + url;
+        const ua = navigator.userAgent || '';
+        const isLine = /Line\//i.test(ua);
+        let launched = false;
+        if (isLine && typeof liff !== 'undefined' && liff && liff.isInClient && liff.isInClient()) {
+          try { liff.sendMessages([{ type:'text', text: msg }]); launched = true; } catch(_){}
+        }
+        if (!launched) {
+          /* フォールバック : intent URLでLINE起動。一般ブラウザはクリップボードへ */
+          const intent = 'line://msg/text/' + encodeURIComponent(msg);
+          try {
+            const a = document.createElement('a'); a.href = intent; document.body.appendChild(a); a.click();
+            setTimeout(function(){ document.body.removeChild(a); }, 100);
+            launched = true;
+          } catch(_){}
+        }
+        if (!launched) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(function(){ toast('URLをコピーしました。LINEに貼り付けて共有してね'); }, function(){ toast('LINE共有に失敗。長押しでURLコピーして', true); });
+          } else {
+            toast('LINE共有に失敗。長押しでURLコピーして', true);
+          }
+        }
+      } catch(e12){ console.warn('[Phase-12 LINE share]', e12); toast('LINE共有エラー', true); }
+    });
+  };
+
+  /* v85.4.6 Phase-12 : 写真/切り株—写真起動ボタンが存在すればバインド、なければ作成 */
+  const Phase12_bindPhoto = function(){
+    let _btn = document.getElementById('btnOpenCamera') || document.getElementById('btnPhotoTop') || document.querySelector('.dash-cell-photo');
+    if (!_btn) {
+      /* 上ツールバーに '写真' ボタンがなければ生成 (id: btnPhotoTop) はしない — 既存UIを壊さない */
+    } else {
+      _btn.addEventListener('click', function(ev){
+        ev.preventDefault();
+        try {
+          const input = document.createElement('input');
+          input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+          input.addEventListener('change', function(e12){
+            try {
+              const file = e12.target.files && e12.target.files[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = function(){ try { Store.set && Store.set({ lastPhoto: reader.result }); toast('写真を取り込みました'); } catch(_){} };
+              reader.readAsDataURL(file);
+            } catch(_){}
+          });
+          document.body.appendChild(input); input.click();
+          setTimeout(function(){ if (input && input.parentNode) input.parentNode.removeChild(input); }, 1500);
+        } catch(e12p){ console.warn('[Phase-12 photo]', e12p); toast('写真起動エラー', true); }
+      });
+    }
+  };
 
   /* ---------- 招待QR ---------- */
   /**

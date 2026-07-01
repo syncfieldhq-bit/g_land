@@ -420,6 +420,19 @@ body.scr-register .bottom-nav{ display:none; }
   line-height:1.2;
   color:var(--c-text);
   background:#fff; white-space:nowrap;
+  min-width:56px;              /* v85.4.6-phase2: 列幅統一 */
+  box-sizing:border-box;
+}
+/* v85.4.6-phase2: スコアカード・パット数併記 (老眼配慮) */
+.card-table td.bt-cell .bt-putt,
+.card-table td.bt-cell small.bt-putt{
+  display:block;
+  font-size:11px;
+  font-weight:700;
+  color:#c07000;
+  margin-top:2px;
+  line-height:1;
+  letter-spacing:0;
 }
 
 /* ヘッダー (ホール番号) = 22px */
@@ -2010,7 +2023,36 @@ body.is-score-pad-open .info-zone{ display:none !important; }
 .dash-cell-cot[data-cot-phase="done"] .dc-sub    { color:#2b8a4c; font-weight:800; }
 
 
-  </style>
+  
+/* v85.4.6-phase2: LINE共有ボタン (自分のスコアのみ共有) */
+.p2-line-share-zone{
+  display:flex;
+  justify-content:center;
+  padding:8px 12px 12px;
+}
+.p2-btn-line-share{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:8px 18px;
+  border:2px solid #06C755;    /* LINE公式グリーン */
+  border-radius:24px;
+  background:#fff;
+  color:#06C755;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+  transition:all 0.15s ease;
+  box-shadow:0 1px 3px rgba(0,0,0,0.08);
+}
+.p2-btn-line-share:hover,
+.p2-btn-line-share:active{
+  background:#06C755;
+  color:#fff;
+  transform:translateY(1px);
+}
+.p2-line-ico{ font-size:16px; }
+</style>
 </head>
 <body class="boot">
 
@@ -2312,6 +2354,13 @@ body.is-score-pad-open .info-zone{ display:none !important; }
       </div>
 
       <!-- ===== v85.3.6 : 情報交換エリア (paneInput 内・スコアカード直下) ===== -->
+      <!-- v85.4.6-phase2: LINE共有ボタン復活 (自分のスコアのみ、個人情報保護) -->
+      <div class="p2-line-share-zone" id="p2LineShareZone">
+        <button type="button" class="p2-btn-line-share" id="btnP2ShareMyScore" title="自分のスコアをLINEで共有">
+          <span class="p2-line-ico">📨</span>
+          <span class="p2-line-lbl">自分のスコアをLINEで共有</span>
+        </button>
+      </div>
       <!-- v85.4.6-phase1: infoZone(広告/告知/写真UP/ｺﾋﾟｰ/LINE) 削除済 → Phase-2で保存モーダル内に再配置予定 -->
     </div>
 
@@ -5068,7 +5117,11 @@ _bindSafe('orientation',     bindOrientation);
           var _v86Par = (window.HOLE_PAR_MAP && window.HOLE_PAR_MAP[h] != null)
                         ? Number(window.HOLE_PAR_MAP[h]) : 4;
           var _v86Html = _v86FormatBoardCell(v, _v86Par, _v86Mode);
-          bodyHtml += '<td class="bt-cell bt-filled">' + _v86Html + '</td>';
+          /* v85.4.6-phase2: パット数を小さく併記 (老眼配慮で見やすい黄色寄せ) */
+          var _puttOut = (sc.putt != null && sc.putt !== '') ? Number(sc.putt) : null;
+          var _puttHtmlOut = (_puttOut != null && !isNaN(_puttOut))
+                             ? ('<small class="bt-putt">Pt' + _puttOut + '</small>') : '';
+          bodyHtml += '<td class="bt-cell bt-filled">' + _v86Html + _puttHtmlOut + '</td>';
         } else {
           bodyHtml += '<td class="bt-cell bt-empty">―</td>';
         }
@@ -5086,7 +5139,11 @@ _bindSafe('orientation',     bindOrientation);
             var _v86Par2 = (window.HOLE_PAR_MAP && window.HOLE_PAR_MAP[h2] != null)
                            ? Number(window.HOLE_PAR_MAP[h2]) : 4;
             var _v86Html2 = _v86FormatBoardCell(v2, _v86Par2, _v86Mode);
-            bodyHtml += '<td class="bt-cell bt-filled">' + _v86Html2 + '</td>';
+            /* v85.4.6-phase2: パット数を小さく併記 */
+            var _puttIn = (sc2.putt != null && sc2.putt !== '') ? Number(sc2.putt) : null;
+            var _puttHtmlIn = (_puttIn != null && !isNaN(_puttIn))
+                              ? ('<small class="bt-putt">Pt' + _puttIn + '</small>') : '';
+            bodyHtml += '<td class="bt-cell bt-filled">' + _v86Html2 + _puttHtmlIn + '</td>';
           } else {
             bodyHtml += '<td class="bt-cell bt-empty">―</td>';
           }
@@ -6177,11 +6234,13 @@ _bindSafe('orientation',     bindOrientation);
       const btnCls = 'start-btn' + (isLocked ? ' is-locked' : '');
       const btnLabel = isLocked ? '同伴者 (本人の端末で入力)' : '▶ 入力開始';
       const btnAttr  = isLocked ? ' disabled aria-disabled="true"' : '';
+      /* v85.4.6-phase2: 自分の入力開始ボタン非表示 (セルタップ入力に統一) */
+      const showBtn = isLocked;  /* 同伴者用のロック表示だけ残す */
       tdName.innerHTML = '<div>' + escapeHtml(p.name) +
         '<span class="player-tag">' + (p.type === 'me' ? '自分' : '同伴') + '</span></div>' +
-        '<button class="' + btnCls + '" data-player="' + escapeAttr(p.name) +
+        (showBtn ? ('<button class="' + btnCls + '" data-player="' + escapeAttr(p.name) +
         '" data-player-type="' + (p.type || 'companion') + '"' + btnAttr + '>' +
-        btnLabel + '</button>' ;
+        btnLabel + '</button>') : '');
       tr.appendChild(tdName);
 
       dom.cells[p.name] = new Array(18).fill(null);
@@ -8118,7 +8177,70 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
   console.log('[round-reset-bridge v85.4.5] ready');
 })();
 </script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous">
+/* v85.4.6-phase2: 自分のスコア共有ハンドラ (個人情報保護: 自分のみ) */
+(function(){
+  function _p2BuildShareUrl(){
+    try {
+      var s = (typeof Store !== 'undefined' && Store.get) ? Store.get() : {};
+      var roundId = String(s.roundId || s.rid || '');
+      var myId    = String(s.userId || '');
+      if (!roundId || !myId) return '';
+      var base = location.origin + location.pathname;
+      /* 自分のスコアだけ見せる ?r=xxx&me=yyy 形式 */
+      return base + '?r=' + encodeURIComponent(roundId) + '&me=' + encodeURIComponent(myId);
+    } catch(e){ return ''; }
+  }
+  function _p2ShareMyScore(){
+    var url = _p2BuildShareUrl();
+    if (!url) {
+      if (typeof toast === 'function') toast('スコア共有URLの生成に失敗しました', true);
+      else alert('スコア共有URLの生成に失敗しました');
+      return;
+    }
+    /* LINE 共有 URL スキーム */
+    var lineUrl = 'https://social-plugins.line.me/lineit/share?url=' + encodeURIComponent(url);
+    /* まずクリップボードにコピー → LINE 起動 */
+    function _copy(cb){
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(cb).catch(cb);
+        } else {
+          var ta = document.createElement('textarea');
+          ta.value = url; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.focus(); ta.select();
+          try { document.execCommand('copy'); } catch(_){}
+          document.body.removeChild(ta);
+          cb();
+        }
+      } catch(_){ cb(); }
+    }
+    _copy(function(){
+      if (typeof toast === 'function') toast('✓ URLコピー完了。LINEアプリで送信してください');
+      /* LINE 共有画面へ遷移 (別タブ) */
+      try { window.open(lineUrl, '_blank'); } catch(_){}
+    });
+  }
+  /* イベントバインド (DOM 準備後) */
+  function _p2BindShareBtn(){
+    var btn = document.getElementById('btnP2ShareMyScore');
+    if (btn && !btn.__p2Bound){
+      btn.__p2Bound = true;
+      btn.addEventListener('click', _p2ShareMyScore);
+    }
+  }
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', _p2BindShareBtn);
+  } else {
+    _p2BindShareBtn();
+  }
+  /* 動的再描画にも備えて定期チェック */
+  setTimeout(_p2BindShareBtn, 500);
+  setTimeout(_p2BindShareBtn, 2000);
+})();
+
+</script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

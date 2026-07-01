@@ -1887,6 +1887,39 @@ body.is-score-pad-open .info-zone{ display:none !important; }
   .board-table{ font-size:14px; }
   .board-table th, .board-table td{ padding:8px 12px; }
   .board-scroll{ max-height:calc(100vh - 120px); }
+  /* v85.4.6 Phase-14 : 横画面専用
+                     - 赤ボタン(round-end-slot rh-finish-btn) は全画面で非表示
+                     - 横画面のスコア入力でシンプル/カウンタータブ行とPi/Putt/確定/LINE/赤/ナビを全削除 */
+}
+
+/* v85.4.6 Phase-14 : 赤ボタン (🏁 ラウンド終了して保存 (○H)) は全画面で完全消去 */
+.rh-finish-btn,
+#finish-round-slot,
+.rh-finish-btn *{
+  display:none !important;
+}
+
+/* v85.4.6 Phase-14 : 横画面のスコア入力画面ではシンプル/カウンタータブ行 + Pi群 + パット群 + 確定 + LINE + 赤ボタン + ボトムナビを全部非表示
+                     結果としてテーブルとカードモードスイッチ(組表示/スコア入力タブ)だけが残る */
+@media (orientation: landscape){
+  body.scr-card #paneInput .panel-inline,
+  body.scr-card #paneInput .panel-confirm,
+  body.scr-card #paneInput .panel-putt,
+  body.scr-card #paneInput .pp-row,
+  body.scr-card #paneInput .panel-inline-tabs,
+  body.scr-card #paneInput .p2-line-share-zone,
+  body.scr-card #paneInput #btnP2ShareMyScore,
+  body.scr-card #paneInput .rh-finish-btn,
+  body.scr-card #paneInput #finish-round-slot,
+  body.scr-card #paneInput .bottom-nav{
+    display:none !important;
+  }
+  /* テーブルだけ画面に表示 */
+  body.scr-card #paneInput .card-scroll{
+    max-height: calc(100dvh - 160px);
+    overflow-x:auto;
+    overflow-y:auto;
+  }
 }
 
 /* ----- 監督席 pane ----- */
@@ -5981,6 +6014,15 @@ _bindSafe('orientation',     bindOrientation);
       const next  = order[(order.indexOf(cur) + 1) % order.length];
       Store.set({ scoreMode: next });
       toast('スコア表示: ' + ({number:'ストローク',diff:'＋/ー',symbol:'◯ー△'})[next]);
+      /* v85.4.6 Phase-14 : スコアモード切替時に組表示 (boardPane) を即時再描画
+         古いコードは Store.subscribe('scoreMode') を経由するため fetch 完了待ちで
+         10秒級かかる症状があった。直接 renderBoard() を即呼び出して即時反応する。 */
+      try {
+        var boardPane = document.getElementById('paneBoard');
+        if (boardPane && boardPane.classList.contains('is-active') && typeof renderBoard === 'function'){
+          renderBoard();
+        }
+      } catch(_){}
     });
     $('#dashHolesBtn').addEventListener('click', function(){
       const next = Store.get().holeMode === 18 ? 9 : 18;
@@ -6153,6 +6195,17 @@ _bindSafe('orientation',     bindOrientation);
         e.preventDefault();
         if (!ensureInlinePanelReady()) { toast('プレイヤー情報がセットされてません', true); return; }
         confirmPanel();
+        /* v85.4.6 Phase-14 : 確定ボタン押下時にインライン側（Pi色・ストローク維持）と
+           パット表示を 0 にリセット。Pi色は維持、ストローク値は維持（ホール切り替え時に再計算） */
+        try {
+          var ppc14 = document.getElementById('ppCurInline');
+          if (ppc14) ppc14.textContent = '0';
+          try { document.querySelectorAll('.pp-btn-inline.active').forEach(function(b){
+            if (Number(b.getAttribute('data-putt')) !== 0) b.classList.remove('active');
+          }); } catch(_){}
+          try { document.querySelectorAll('.pp-btn-inline[data-putt="0"]').forEach(function(b){ b.classList.add('active'); }); } catch(_){}
+          panel.putt = 0;
+        } catch(_){}
         updateInlineHeader();
       });
       /* Piボタン (シンプル) : インライン側も panel.stroke にセット */
@@ -6210,7 +6263,16 @@ _bindSafe('orientation',     bindOrientation);
             btn.classList.add('active');
           } catch(_){}
           updateInlineHeader();
-          console.log('[Pi] Phase-9: hole='+(panel.hole&&panel.hole.no)+' par='+_parNow+' delta='+_delta+' → panel.stroke='+panel.stroke);
+          /* v85.4.6 Phase-14 : Piボタン押した瞬間にローカルストレージへ即時保存
+             ユーザーは Pi押した瞬間に「数字が入った」と感じたい。確定ボタンは次ホール送りに徹する */
+          try {
+            if (panel && panel.hole && panel.name && window.Store && Store.setScore) {
+              var _idx14p = panel.hole.no - 1;
+              Store.setScore(panel.name, _idx14p, panel.stroke, panel.putt || 0);
+              try { renderTableFull(Store.get()); } catch(_){}
+            }
+          } catch(e14p){ console.warn('[Phase-14 Pi即時保存]', e14p); }
+          console.log('[Pi] Phase-14: hole='+(panel.hole&&panel.hole.no)+' par='+_parNow+' delta='+_delta+' → panel.stroke='+panel.stroke);
         });
       }
       /* pp-btn-inline : インラインパットボタン */
@@ -6224,6 +6286,14 @@ _bindSafe('orientation',     bindOrientation);
           var cur = document.getElementById('ppCurInline');
           if (cur) cur.textContent = String(p);
           updateInlineHeader();
+          /* v85.4.6 Phase-14 : パットボタン押した瞬間にローカルストレージへ即時保存 */
+          try {
+            if (panel && panel.hole && panel.name && window.Store && Store.setScore) {
+              var _idx14u = panel.hole.no - 1;
+              Store.setScore(panel.name, _idx14u, panel.stroke || 0, p);
+              try { renderTableFull(Store.get()); } catch(_){}
+            }
+          } catch(e14u){ console.warn('[Phase-14 パット即時保存]', e14u); }
         });
       });
       /* バインド直後に一回ヘッダを仕込み (自動でcurrentHoleセットして見やすく) */
@@ -8943,7 +9013,8 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
   document.addEventListener('click', function(e){
     var t = e.target;
     if (!t || !t.id) return;
-    if (t.id !== 'btnPanelConfirm' && t.id !== 'iproCommitBtn') return;
+    /* v85.4.6 Phase-14 : btnPanelConfirmInline (インライン側確定) も対象に追加 */
+    if (t.id !== 'btnPanelConfirm' && t.id !== 'iproCommitBtn' && t.id !== 'btnPanelConfirmInline') return;
     setTimeout(function(){
       try {
         var s = (window.Store && (Store.get||Store.getState) && (Store.get?Store.get():Store.getState())) || {};
@@ -8963,8 +9034,12 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
         if (allFilled) {
           var sheet = document.getElementById('rhSheet');
           if (sheet && sheet.classList.contains('show')) return; // 既に出てる
+          /* v85.4.6 Phase-14 : 全H埋まり時の保存モーダル復帰
+             openRoundFinishSheet (openSheet) が定義されていれば、フェード付きで 400ms 後に下からせり上げる */
           if (typeof window.openRoundFinishSheet === 'function') {
-            setTimeout(window.openRoundFinishSheet, 1200);
+            setTimeout(window.openRoundFinishSheet, 400);
+          } else if (typeof openSheet === 'function') {
+            setTimeout(openSheet, 400);
           }
         }
       } catch(err){ console.error('[rhSave fallback]', err); }

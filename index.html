@@ -5223,6 +5223,7 @@ _bindSafe('orientation',     bindOrientation);
         }
       } catch(_) {}
     });
+    /* v85.4.6-phase2.1 A案: paneInputPro は自動起動対象。以下の無効化ロジックは維持 */
     /* v85.3.6 : PRO 内ボタンは到達しないが念のため無効化 (paneInputPro は表示されない)
        — 元の各 _safeBind は残しても発火しないが、PRO起動経路は塞いだのでOK */
     // v85.3.0 : PRO 内の「閉じる」ボタン -> 組表示へ
@@ -5708,6 +5709,8 @@ _bindSafe('orientation',     bindOrientation);
       } catch(_){}
       setScreen('card');
       try { if (typeof window._hideGuestWaitingUi_ === 'function') window._hideGuestWaitingUi_(); } catch(_){}
+      /* v85.4.6-phase2.1 A案: 既存ラウンド継続時も自動でPRO入力画面を開く */
+      try { if (typeof _p2AutoOpenInputPro === 'function') _p2AutoOpenInputPro(); } catch(_){}
       return Promise.resolve(null);
     }
     if (_startingRound) {
@@ -5734,6 +5737,8 @@ _bindSafe('orientation',     bindOrientation);
       setScreen('card');
       toast('ラウンドを開始しました');
       try { if (typeof window._hideGuestWaitingUi_ === 'function') window._hideGuestWaitingUi_(); } catch(_){}
+      /* v85.4.6-phase2.1 A案: 新規ラウンド開始成功後、自動でPRO入力画面を開く */
+      try { if (typeof _p2AutoOpenInputPro === 'function') _p2AutoOpenInputPro(); } catch(_){}
       /* v72.2.1 : ホストがラウンド開始を押したとき、
          サーバの status を 'in_progress' へ遷移させる
          (ゲストはこれを pulse ポーリングで検知してスコアカードへ遷移) */
@@ -8239,6 +8244,58 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
   setTimeout(_p2BindShareBtn, 500);
   setTimeout(_p2BindShareBtn, 2000);
 })();
+
+/* v85.4.6-phase2.1 A案: ラウンド開始後 PRO 入力画面自動起動 */
+(function(){
+  function _switchToPro(){
+    try {
+      /* bindCardModeSwitch の activatePane を使いたいが scope 外 → 直接DOM操作 */
+      var panes = {
+        input:     document.getElementById('paneInput'),
+        board:     document.getElementById('paneBoard'),
+        hostCheck: document.getElementById('paneHostCheck'),
+        inputPro:  document.getElementById('paneInputPro')
+      };
+      Object.keys(panes).forEach(function(k){
+        if (!panes[k]) return;
+        if (k === 'inputPro') panes[k].classList.add('is-active');
+        else                  panes[k].classList.remove('is-active');
+      });
+      /* タブボタンの is-active も同期 */
+      var sw = document.getElementById('cardModeSwitch');
+      if (sw){
+        var btns = sw.querySelectorAll('.cms-btn');
+        Array.prototype.forEach.call(btns, function(b){
+          if (b.getAttribute('data-mode') === 'inputPro') b.classList.add('is-active');
+          else                                            b.classList.remove('is-active');
+        });
+      }
+      /* screen-card のフルスクリーンクラスも付与 */
+      var screenCard = document.getElementById('screen-card');
+      if (screenCard) screenCard.classList.add('card-pro-fullscreen');
+      /* Store の scoreScreenMode 更新 (renderTableFull 再描画用) */
+      try {
+        if (typeof Store !== 'undefined' && Store.set) {
+          Store.set({ scoreScreenMode: 'inputPro' });
+        }
+      } catch(_){}
+      try {
+        if (typeof renderTableFull === 'function' && typeof Store !== 'undefined') {
+          renderTableFull(Store.get());
+        }
+      } catch(_){}
+    } catch(e){
+      console.warn('[p2.1] switchToPro fail:', e);
+    }
+  }
+  /* setScreen('card') 直後に DOM が確実に居るとは限らんので少し遅延 */
+  window._p2AutoOpenInputPro = function(){
+    /* screen-card が可視状態になってから発動させる */
+    setTimeout(_switchToPro, 60);
+    setTimeout(_switchToPro, 300);  /* 二段掛けで確実に */
+  };
+})();
+
 
 </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>

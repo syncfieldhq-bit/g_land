@@ -7032,13 +7032,35 @@ _bindSafe('orientation',     bindOrientation);
       $('#floatingBar').classList.add('show');
     }
   }
+
+  /* v85.4.6 Phase-11 : ガイドホールをミニマルパンのラベルから拾う */
+  function setLastGuideHole(holeNo){
+    try { localStorage.setItem('gw.lastGuideHole', String(holeNo)); } catch(_){}
+  }
+  function getLastGuideHole(){
+    try { var v = localStorage.getItem('gw.lastGuideHole'); return v ? parseInt(v,10) : 1; } catch(_){ return 1; }
+  }
   function resumePanel(){
     if (!panel.hole || !panel.name) return;
     $('#floatingBar').classList.remove('show');
-    renderPanel();
-    $('#inputPanel').classList.add('open');
-    $('#panelMask').classList.add('show');
-    updateNavButtons();
+    /* v85.4.6 Phase-11 : 復帰時は必ず modify=true で openPanelByHoleNo し直して、
+       ストローク値・パット値・ボタンの active 表示もホール丸ごと復元する */
+    try {
+      var _no = panel.hole.no;
+      var _nm = panel.name;
+      var _hadModify = panel.modify;
+      var _oldStroke = panel.stroke;
+      var _oldPutt   = panel.putt;
+      openPanelByHoleNo(_nm, _no, true);
+      /* openPanelByHoleNo の中で既存値があればそれを採用するので明示復元は不要 */
+      console.log('[Phase-11 resume] no='+_no+' name='+_nm+' had stroke='+_oldStroke+' putt='+_oldPutt+' modify='+_hadModify);
+    } catch(e11b){
+      console.warn('[Phase-11 resume]', e11b);
+      renderPanel();
+      $('#inputPanel').classList.add('open');
+      $('#panelMask').classList.add('show');
+      updateNavButtons();
+    }
   }
   function closePanel(){
     panel.open = false;
@@ -7171,7 +7193,11 @@ _bindSafe('orientation',     bindOrientation);
     }
 
     if (isModify) {
+      /* v85.4.6 Phase-11 : 修正確定 → フローティングバー出して「元の位置に戻れる」状態にする。
+         ユーザーがフローティングバー or 元ホールセルをタップしたら、また openPanelByHoleNo(name, holeNo, true) で戻る */
+      setLastGuideHole(holeNo);
       minimizePanel();
+      toast(holeNo + 'H 修正保存 しました (?'+holeNo+'H タップで戻り)');
     } else if (holeNo < lim) {
       openPanelByHoleNo(name, holeNo + 1, false);
       /* Pi/Putt ボタンの active をリセット */

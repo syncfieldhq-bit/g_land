@@ -368,14 +368,16 @@ body.scr-register .bottom-nav{ display:none; }
   border-bottom:1px solid var(--c-line);
   flex-shrink:0;                                    /* ★ ヘッダーは縮まない */
 }
-.card-dash-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.card-dash-grid{ display:flex; flex-wrap:nowrap; overflow-x:auto; gap:6px; scrollbar-width:none; -ms-overflow-style:none; }
+.card-dash-grid::-webkit-scrollbar{ display:none; }
 .dash-cell{
   background:var(--c-green-pale); border-radius:12px;
-  padding:6px 8px; text-align:center;
+  padding:6px 10px; text-align:center;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
-  min-height:60px;
+  min-height:60px; min-width:78px;
   border:2px solid transparent;
   transition:transform .12s, border-color .12s;
+  flex:0 0 auto;
 }
 .dash-cell.dash-tap{ cursor:pointer; }
 .dash-cell.dash-tap:active{ transform:scale(.96); border-color:var(--c-green); }
@@ -883,6 +885,36 @@ body.scr-register .bottom-nav{ display:none; }
   letter-spacing:.1em;
 }
 .panel-confirm:active{ background:var(--c-green-dark); transform:scale(.985); }
+
+/* === v85.4.6 Phase-3 : インライン入力パネル (スコアカード直下に埋め込み) === */
+.panel-inline{
+  background:#fff;
+  border-radius:12px;
+  border:1px solid var(--c-line);
+  padding:8px;
+  margin:8px 0;
+  display:flex; flex-direction:column; gap:6px;
+}
+.panel-inline-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:4px 8px; background:var(--c-green-pale); border-radius:8px;
+}
+.panel-inline-head .pi-hole{ font-size:18px; font-weight:900; color:var(--c-green-dark); }
+.panel-inline-head .pi-hole small{ font-size:12px; margin-left:2px; }
+.panel-inline-head .pi-par{ font-size:12px; font-weight:700; color:var(--c-text-sub); }
+.panel-inline-head .pi-par span{ font-size:16px; margin-left:4px; color:var(--c-text); font-weight:900; }
+.panel-inline .panel-tabs{ margin:0; margin-bottom:4px; }
+.panel-inline .pi-pane{ display:none; }
+.panel-inline .pi-pane.active{ display:block; }
+.panel-inline .panel-input{ margin:0; }
+.panel-inline .panel-putt{ margin:0; }
+.panel-inline .panel-confirm{
+  position:static; width:100%; margin:0;
+  min-height:50px; border-radius:12px;
+  background:var(--c-green); color:#fff; font-size:16px; font-weight:900;
+  border:none;
+}
+.panel-inline .panel-confirm:active{ background:var(--c-green-dark); transform:scale(.985); }
 
 /* ---------- 汎用モーダル ---------- */
 .gm-mask{ position:fixed; inset:0; background:rgba(0,0,0,.55);
@@ -2313,27 +2345,33 @@ body.is-score-pad-open .info-zone{ display:none !important; }
           <div class="dash-cell dash-cell-status">
             <span class="dc-ico">📡</span><span class="dc-lbl">同期</span><span class="dc-val" id="dashSync">―</span>
           </div>
+          <!-- v85.4.6 Phase-2 : LINEX221共有を1行ツールバーに追加 (入力の邪魔せえへん) -->
+          <button class="dash-cell dash-tap dash-cell-line" id="btnLineShareTop" aria-label="自分のスコアをLINEで共有">
+            <span class="dc-ico">📲</span><span class="dc-lbl">LINE共有</span>
+          </button>
+          <!-- v85.4.6 Phase-2 : 招待QR と ✕ も1行に統合 -->
+          <button class="dash-cell dash-tap dash-cell-qr" id="btnShowInviteQRCard" aria-label="招待QR発行">
+            <span class="dc-ico">📷</span><span class="dc-lbl">招待QR</span>
+          </button>
+          <button class="dash-cell dash-tap dash-cell-close" id="btnCloseCard" aria-label="閉じる">
+            <span class="dc-ico">✕</span><span class="dc-lbl">閉じる</span>
+          </button>
         </div>
-      </div>
-      <!-- v71.3 Phase 4-e : 右縦アクション列 (× + 📷QR) -->
-      <div class="card-dash-side">
-        <button class="card-side-close" id="btnCloseCard" aria-label="閉じる">✕</button>
-        <button class="card-side-qr" id="btnShowInviteQRCard" aria-label="招待QR発行">
-          <span class="csq-ico">📷</span>
-          <span class="csq-lbl">招待QR</span>
-        </button>
       </div>
     </div>
 
     <div id="roundMismatchWarning" class="round-mismatch-warning"></div>
 
-    <!-- ===== v71.3 Phase 4-a : モードスイッチャ (3 pane) ===== -->
+    <!-- ===== v85.4.6 Phase-2 : タブを再設計 (既定=スコア入力・自分だけ表示) ===== -->
     <div class="card-modeswitch" id="cardModeSwitch">
-      <button class="cms-btn is-active" data-mode="input" id="btnSwitchToInput" type="button">
-        <span class="cms-ico">📝</span>自分入力
-      </button>
       <button class="cms-btn" data-mode="board" id="btnSwitchToBoard" type="button">
         <span class="cms-ico">📊</span>組表示
+      </button>
+      <button class="cms-btn is-active" data-mode="input" id="btnSwitchToInput" type="button" aria-label="スコア入力">
+        <span class="cms-ico">📝</span>スコア入力
+      </button>
+      <button class="cms-btn cms-pro" data-mode="inputPro" id="btnSwitchToInputPro" type="button" aria-label="アドバンス入力">
+        <span class="cms-ico">⚡</span>拡張
       </button>
       <button class="cms-btn cms-host is-guest-hidden" data-mode="hostCheck" id="btnOpenHostCheck" type="button">
         <span class="cms-ico">🛡</span>監督
@@ -2353,8 +2391,52 @@ body.is-score-pad-open .info-zone{ display:none !important; }
         <table class="card-table" id="cardTable"><thead></thead><tbody></tbody></table>
       </div>
 
-      <!-- ===== v85.3.6 : 情報交換エリア (paneInput 内・スコアカード直下) ===== -->
-      <!-- v85.4.6-phase2: LINE共有ボタン復活 (自分のスコアのみ、個人情報保護) -->
+      <!-- ===== v85.4.6 Phase-3 : 入力パネルを スコアカード直下に埋め込み ===== -->
+      <div class="panel-inline" id="panelInline">
+        <div class="panel-inline-head">
+          <div class="pi-hole"><span id="phInlineHoleNo">―</span><small>H</small></div>
+          <div class="pi-par">PAR<span id="phInlinePar">―</span></div>
+        </div>
+        <div class="panel-tabs panel-inline-tabs" data-bind="inputModeInline">
+          <button data-val="simple" class="active">シンプル</button>
+          <button data-val="counter">カウンター</button>
+        </div>
+        <div class="panel-input">
+          <div class="pi-pane pi-simple-inline active">
+            <div class="pi-grid pi-grid-5">
+              <button class="pi-btn pi-eagle"  data-delta="-2"><span class="pi-num-big" id="psi-2">2</span><span class="pi-lbl">イーグル</span></button>
+              <button class="pi-btn pi-birdie" data-delta="-1"><span class="pi-num-big" id="psi-1">3</span><span class="pi-lbl">バーディ</span></button>
+              <button class="pi-btn pi-par"    data-delta="0"><span class="pi-num-big"  id="psi0">4</span><span class="pi-lbl">パー</span></button>
+              <button class="pi-btn pi-bogey"  data-delta="1"><span class="pi-num-big"  id="psi1">5</span><span class="pi-lbl">ボギー</span></button>
+              <button class="pi-btn pi-dbogey" data-delta="2"><span class="pi-num-big"  id="psi2">6</span><span class="pi-lbl">Dボギー</span></button>
+            </div>
+          </div>
+          <div class="pi-pane pi-counter-inline">
+            <div class="pi-counter-row">
+              <button class="pi-cc pi-cc-minus" id="pcMinusInline">−</button>
+              <div class="pi-cc-display">
+                <div class="pi-cc-num" id="pcNumInline">0</div>
+                <div class="pi-cc-cap">タップでカウント</div>
+              </div>
+              <button class="pi-cc pi-cc-plus" id="pcPlusInline">＋</button>
+            </div>
+          </div>
+        </div>
+        <section class="panel-putt">
+          <div class="pp-lbl">🏌 パット数 <span class="pp-cur" id="ppCurInline">0</span></div>
+          <div class="pp-row">
+            <button class="pp-btn pp-btn-inline active" data-putt="0">0</button>
+            <button class="pp-btn pp-btn-inline" data-putt="1">1</button>
+            <button class="pp-btn pp-btn-inline" data-putt="2">2</button>
+            <button class="pp-btn pp-btn-inline" data-putt="3">3</button>
+            <button class="pp-btn pp-btn-inline" data-putt="4">4</button>
+            <button class="pp-btn pp-btn-inline" data-putt="5">5</button>
+          </div>
+        </section>
+        <button class="panel-confirm" id="btnPanelConfirmInline">✓ 確定</button>
+      </div>
+
+      <!-- v85.4.6 Phase-3 : LINE共有 は入力パネル直下に配置 -->
       <div class="p2-line-share-zone" id="p2LineShareZone">
         <button type="button" class="p2-btn-line-share" id="btnP2ShareMyScore" title="自分のスコアをLINEで共有">
           <span class="p2-line-ico">📨</span>
@@ -2545,18 +2627,13 @@ body.is-score-pad-open .info-zone{ display:none !important; }
       <div class="panel-input">
         <!-- シンプル : 旧天気予報式の機能をそのまま継承 -->
         <div class="pi-pane pi-simple active">
+          <!-- v85.4.6 Phase-2 : PAR中心5個に集約 (+3〜+6削除済) -->
           <div class="pi-grid pi-grid-5">
             <button class="pi-btn pi-eagle"  data-delta="-2"><span class="pi-num-big" id="ps-2">2</span><span class="pi-lbl">イーグル</span></button>
             <button class="pi-btn pi-birdie" data-delta="-1"><span class="pi-num-big" id="ps-1">3</span><span class="pi-lbl">バーディ</span></button>
             <button class="pi-btn pi-par"    data-delta="0"><span class="pi-num-big"  id="ps0">4</span><span class="pi-lbl">パー</span></button>
             <button class="pi-btn pi-bogey"  data-delta="1"><span class="pi-num-big"  id="ps1">5</span><span class="pi-lbl">ボギー</span></button>
             <button class="pi-btn pi-dbogey" data-delta="2"><span class="pi-num-big"  id="ps2">6</span><span class="pi-lbl">Dボギー</span></button>
-          </div>
-          <div class="pi-grid pi-grid-4">
-            <button class="pi-btn" data-delta="3"><span class="pi-num-big" id="ps3">7</span><span class="pi-lbl">+3</span></button>
-            <button class="pi-btn" data-delta="4"><span class="pi-num-big" id="ps4">8</span><span class="pi-lbl">+4</span></button>
-            <button class="pi-btn" data-delta="5"><span class="pi-num-big" id="ps5">9</span><span class="pi-lbl">+5</span></button>
-            <button class="pi-btn" data-delta="6"><span class="pi-num-big" id="ps6">10</span><span class="pi-lbl">+6</span></button>
           </div>
         </div>
 
@@ -5857,6 +5934,90 @@ _bindSafe('orientation',     bindOrientation);
   function bindPanel(){
     $('#panelMask').addEventListener('click', minimizePanel);
     $('#btnPanelConfirm').addEventListener('click', confirmPanel);
+    /* v85.4.6 Phase-3 : インライン入力パネルの ✓確定ボタンも同じ confirmPanel() を呼ぶ */
+    (function bindInlinePanelPhase3(){
+      var btnInline = document.getElementById('btnPanelConfirmInline');
+      if (btnInline) btnInline.addEventListener('click', function(e){ e.preventDefault(); confirmPanel(); });
+      /* Piボタン (シンプル) : インライン側も panel.stroke にセット */
+      var inlinePane = document.querySelector('.pi-simple-inline');
+      if (inlinePane){
+        inlinePane.addEventListener('click', function(ev){
+          var btn = ev.target.closest('.pi-btn'); if (!btn) return;
+          var delta = Number(btn.getAttribute('data-delta')||0);
+          var hole = (panel && panel.hole) || null;
+          var par = (hole && hole.par) || 4;
+          panel.stroke = par + delta;
+          try {
+            inlinePane.querySelectorAll('.pi-btn').forEach(function(b){ b.classList.remove('active'); });
+            btn.classList.add('active');
+          } catch(_){}
+        });
+      }
+      /* pp-btn-inline : インラインパットボタン */
+      document.querySelectorAll('.pp-btn-inline').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var p = Number(btn.getAttribute('data-putt')||0);
+          panel.putt = p;
+          document.querySelectorAll('.pp-btn-inline').forEach(function(b){ b.classList.remove('active'); });
+          btn.classList.add('active');
+          var cur = document.getElementById('ppCurInline');
+          if (cur) cur.textContent = String(p);
+        });
+      });
+      /* Simple/Counter タブ切替 (インライン) */
+      var tabsInline = document.querySelector('.panel-inline-tabs');
+      if (tabsInline){
+        tabsInline.addEventListener('click', function(ev){
+          var t = ev.target.closest('button[data-val]'); if (!t) return;
+          var val = t.getAttribute('data-val');
+          tabsInline.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+          t.classList.add('active');
+          var pi = document.querySelector('.panel-inline .pi-simple-inline');
+          var pc = document.querySelector('.panel-inline .pi-counter-inline');
+          if (val === 'simple'){ if(pi) pi.classList.add('active'); if(pc) pc.classList.remove('active'); }
+          else { if(pi) pi.classList.remove('active'); if(pc) pc.classList.add('active'); }
+        });
+      }
+      /* インラインカウンター −/+ */
+      var minus = document.getElementById('pcMinusInline');
+      var plus  = document.getElementById('pcPlusInline');
+      var numEl = document.getElementById('pcNumInline');
+      function updateInlineCounter(v){
+        if (numEl) numEl.textContent = String(v);
+        panel.stroke = v;
+      }
+      if (minus) minus.addEventListener('click', function(){
+        var cur = Number((numEl && numEl.textContent) || 0);
+        if (cur > 0) updateInlineCounter(cur - 1);
+      });
+      if (plus) plus.addEventListener('click', function(){
+        var cur = Number((numEl && numEl.textContent) || 0);
+        updateInlineCounter(cur + 1);
+      });
+      /* panel.hole 変更時にインライン header を更新するフック */
+      var origOpen = window.openPanelByHoleNo;
+      if (typeof origOpen === 'function' && !window.__phase3PatchedOpen){
+        window.__phase3PatchedOpen = true;
+        window.openPanelByHoleNo = function(name, holeNo, modify){
+          var r = origOpen.apply(this, arguments);
+          try {
+            var h = (typeof getHoleByNo === 'function') ? getHoleByNo(holeNo) : null;
+            var no = (h && h.no) || holeNo;
+            var par = (h && h.par) || 4;
+            var elNo = document.getElementById('phInlineHoleNo');
+            var elPar= document.getElementById('phInlinePar');
+            if (elNo) elNo.textContent = String(no);
+            if (elPar) elPar.textContent = String(par);
+            /* Piボタンの数字を par 基準で更新 */
+            for (var d=-2; d<=2; d++){
+              var el = document.getElementById('psi'+d);
+              if (el) el.textContent = String(par + d);
+            }
+          } catch(_){}
+          return r;
+        };
+      }
+    })();
     $('#pnPrev').addEventListener('click', function(e){ e.stopPropagation(); moveHole(-1); });
     $('#pnNext').addEventListener('click', function(e){ e.stopPropagation(); moveHole(+1); });
     $('#pnClose').addEventListener('click', function(e){ e.stopPropagation(); minimizePanel(); });
@@ -8343,6 +8504,5 @@ body.scr-history-detail .screen#screen-history-detail{ display:block; }
 
 
 </script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

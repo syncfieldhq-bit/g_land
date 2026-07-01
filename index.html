@@ -370,20 +370,23 @@ body.scr-register .bottom-nav{ display:none; }
 }
 .card-dash-grid{ display:flex; flex-wrap:nowrap; overflow-x:auto; gap:6px; scrollbar-width:none; -ms-overflow-style:none; }
 .card-dash-grid::-webkit-scrollbar{ display:none; }
+/* v85.4.6 Phase-6 : dash-cell 縦幅圧縮 */
 .dash-cell{
-  background:var(--c-green-pale); border-radius:12px;
-  padding:6px 10px; text-align:center;
+  background:var(--c-green-pale); border-radius:10px;
+  padding:3px 6px; text-align:center;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
-  min-height:60px; min-width:78px;
+  min-height:44px; min-width:70px;
   border:2px solid transparent;
   transition:transform .12s, border-color .12s;
   flex:0 0 auto;
+  line-height:1.15;
 }
 .dash-cell.dash-tap{ cursor:pointer; }
 .dash-cell.dash-tap:active{ transform:scale(.96); border-color:var(--c-green); }
-.dash-cell .dc-ico{ font-size:18px; }
-.dash-cell .dc-lbl{ font-size:10px; color:var(--c-text-sub); font-weight:700; }
-.dash-cell .dc-val{ font-size:var(--fs-md); font-weight:800; color:var(--c-green-dark); }
+.dash-cell .dc-ico{ font-size:14px; margin-bottom:1px; }
+.dash-cell .dc-lbl{ font-size:9px; color:var(--c-text-sub); font-weight:700; }
+.dash-cell .dc-val{ font-size:11px; font-weight:800; color:var(--c-green-dark); }
+.dash-cell .dc-sub{ font-size:8px; opacity:.7; }
 .dash-cell-cot{ background:#fff7d6; }
 .dash-cell-cot .dc-val{ color:#b27a00; }
 .dash-cell-status{ background:#fff7d6; }
@@ -552,6 +555,16 @@ body.scr-register .bottom-nav{ display:none; }
 .card-table td.editable{ cursor:pointer; }
 .card-table td.editable:active{ background:#d9eede; }
 .card-table td.score-locked{ opacity:.35; }
+
+/* v85.4.6 Phase-6 : 入力中ホールの列ハイライト (3行縦串) */
+.card-table td.hole-active{
+  background:#fff3b8 !important;
+  box-shadow:inset 0 0 0 2px #ffb937;
+  font-weight:800;
+}
+.card-table tr.row-me td.hole-active{ background:#fff0a3 !important; }
+.card-table tr.row-putt td.hole-active{ background:#fff5c8 !important; }
+.card-table tr.row-par  td.hole-active{ background:#ffedb0 !important; }
 
 /* v85.4.6 Phase-4 : PARセルをタップで編集可能に */
 .card-table td.editable-par{
@@ -1338,7 +1351,7 @@ body.scr-register .bottom-nav{ display:none; }
  * ============================================================ */
 
 /* ----- モードスイッチャ (スコア画面の上部に固定) ----- */
-/* v85.4.6 Phase-5 : タブ高さ圧縮 (3割ダウン) + 強制並列 */
+/* v85.4.6 Phase-6 : タブ2割強制 (paneBoardでも消えないよう) */
 .card-modeswitch{
   display:flex !important;
   flex-direction:row !important;
@@ -1346,17 +1359,24 @@ body.scr-register .bottom-nav{ display:none; }
   gap:4px; padding:3px 6px;
   background:#f3faf5; border-bottom:1px solid #cfe5d6;
   position:sticky; top:0; z-index:5;
+  width:100% !important;
+  box-sizing:border-box;
 }
-.cms-btn{
+.card-modeswitch > .cms-btn{
   flex:1 1 50% !important;
-  min-height:28px !important;
-  max-height:32px;
+  width:50% !important;
+  min-width:0 !important;
+  min-height:30px !important;
+  max-height:34px;
   border:none; border-radius:8px;
   background:#dff0e3; color:#234c33;
   font-weight:700; font-size:12px;
-  display:flex; align-items:center; justify-content:center; gap:4px;
+  display:flex !important;
+  align-items:center; justify-content:center; gap:4px;
   transition:transform .1s, background-color .15s;
   padding:0 6px;
+  visibility:visible !important;
+  opacity:1 !important;
 }
 .cms-btn:active{ transform:scale(.96); }
 .cms-btn.is-active{ background:#2b8a4c; color:#fff; }
@@ -2021,21 +2041,23 @@ body.is-score-pad-open .info-zone{ display:none !important; }
   display:flex; flex-direction:column; gap:6px;
 }
 
-/* v85.4.6 Phase-4 : 1行・横スクロールに変更 (3行gridを廃止) */
+/* v85.4.6 Phase-6 : 1行・横スクロール + セル圧縮 */
+.card-dash{ padding:2px 6px !important; }
 .card-dash .card-dash-grid{
-  display:flex;
-  flex-wrap:nowrap;
+  display:flex !important;
+  flex-wrap:nowrap !important;
   overflow-x:auto;
-  gap:6px;
-  padding-bottom:4px;
+  gap:4px;
+  padding-bottom:2px;
   scrollbar-width:none;
   -ms-overflow-style:none;
 }
 .card-dash .card-dash-grid::-webkit-scrollbar{ display:none; }
 .card-dash .card-dash-grid > .dash-cell{
-  flex:0 0 auto;
-  width:84px;
-  min-width:84px;
+  flex:0 0 auto !important;
+  width:72px !important;
+  min-width:72px !important;
+  min-height:44px !important;
 }
 
 /* hide legacy floating buttons (replaced by side column) */
@@ -6567,6 +6589,12 @@ _bindSafe('orientation',     bindOrientation);
     renderScoreTableBody_(s, cols);
     dom.structKey = _buildStructKey(s);
     _paintAllCells(s);
+    /* v85.4.6 Phase-6 : 列ハイライトを再描画後も維持 */
+    try {
+      if (typeof panel !== 'undefined' && panel && panel.hole) {
+        _highlightActiveHole(panel.hole.no);
+      }
+    } catch(_){}
   }
 
   function renderScoreTableBody_(s, cols){
@@ -6782,11 +6810,33 @@ _bindSafe('orientation',     bindOrientation);
     modify : false
   };
 
+  /* v85.4.6 Phase-6 : 列ハイライト制御 */
+  function _highlightActiveHole(holeNo){
+    try {
+      var tbl = document.getElementById('cardTable');
+      if (!tbl) return;
+      tbl.querySelectorAll('td.hole-active').forEach(function(td){ td.classList.remove('hole-active'); });
+      if (!holeNo) return;
+      tbl.querySelectorAll('td[data-hole-no="' + holeNo + '"]').forEach(function(td){
+        td.classList.add('hole-active');
+      });
+    } catch(_){}
+  }
+
   function openPanelByHoleNo(playerName, holeNo, modify){
     const s = Store.get();
     if (!s.roundId) { startRound(); }
     const hole = getHoleByNo(holeNo);
     if (!hole) { toast('ホール ' + holeNo + ' が見つかりません', true); return; }
+    /* v85.4.6 Phase-6 : 前回のハイライトを消して新しいホール列を強調 */
+    _highlightActiveHole(holeNo);
+    /* ヘッダの 現在:XH PAR X も同時更新 */
+    try {
+      var el1 = document.getElementById('phInlineHoleNo');
+      var el2 = document.getElementById('phInlinePar');
+      if (el1) el1.textContent = String(hole.no);
+      if (el2) el2.textContent = String(hole.par);
+    } catch(_){}
 
     const inputPanelEl = document.getElementById('inputPanel');
     if (inputPanelEl) inputPanelEl.setAttribute('aria-hidden','false');
@@ -6901,28 +6951,60 @@ _bindSafe('orientation',     bindOrientation);
   }
 
   function confirmPanel(){
-    if (!panel.hole) return;
-    if (panel.stroke <= 0) return toast('ストロークを入力してください', true);
+    /* v85.4.6 Phase-6 : panel.hole 未セットのときは自分の未入力最初のHにフォールバック */
+    if (!panel.hole) {
+      try {
+        var s0 = Store.get();
+        if (!s0.roundId) { startRound(); s0 = Store.get(); }
+        var me = (s0.players||[]).find(function(p){ return p && p.type === 'me'; });
+        if (me) {
+          var lim0 = Store.calc.holeCount();
+          var slot0 = (s0.scores||{})[me.name] || { stroke:[] };
+          var nextNo0 = 1;
+          for (var i0=0;i0<lim0;i0++){ if (slot0.stroke[i0] == null) { nextNo0 = i0 + 1; break; } if (i0 === lim0-1) nextNo0 = lim0; }
+          openPanelByHoleNo(me.name, nextNo0, false);
+        }
+      } catch(_){}
+    }
+    if (!panel.hole) { toast('フォーカス中のホールが不明です', true); return; }
+    /* v85.4.6 Phase-6 : Pi未押のなら PAR デフォルト */
+    if (panel.stroke <= 0) {
+      panel.stroke = (panel.hole && panel.hole.par) || 4;
+    }
     const isModify = panel.modify;
     const name     = panel.name;
     const holeNo   = panel.hole.no;
     const idx0     = holeNo - 1;
     const stroke   = panel.stroke;
-    const putt     = panel.putt;
+    const putt     = (panel.putt != null) ? panel.putt : 0;
     const lim      = Store.calc.holeCount();
+
+    /* v85.4.6 Phase-6 : 先にストア保存 → 再描画を強制 */
+    var saveP = Store.setScore(name, idx0, stroke, putt);
+    try { renderTableFull(Store.get()); } catch(_){}
+    if (saveP && saveP.then) {
+      saveP.then(function(r){
+        const mode = (r && r.ok) ? (r.mode === 'insert' ? '新規' : '更新') : 'ローカル保存';
+        if (window.gwSetSync) gwSetSync('✓ ' + mode + ' ' + holeNo + 'H');
+        toast(holeNo + 'H スコア ' + stroke + ' / パット ' + putt + ' 保存');
+      });
+    }
 
     if (isModify) {
       minimizePanel();
     } else if (holeNo < lim) {
       openPanelByHoleNo(name, holeNo + 1, false);
+      /* Pi/Putt ボタンの active をリセット */
+      try {
+        document.querySelectorAll('.pi-btn.active').forEach(function(b){ b.classList.remove('active'); });
+        document.querySelectorAll('.pp-btn-inline.active').forEach(function(b){ b.classList.remove('active'); });
+        var ppc = document.getElementById('ppCurInline'); if (ppc) ppc.textContent = '0';
+        panel.putt = 0;
+      } catch(_){}
     } else {
       minimizePanel();
       toast('全ホール入力完了！お疲れさまでした');
     }
-    Store.setScore(name, idx0, stroke, putt).then(function(r){
-      const mode = (r && r.ok) ? (r.mode === 'insert' ? '新規' : '更新') : '保存';
-      if (window.gwSetSync) gwSetSync('✓ ' + mode + ' ' + holeNo + 'H');
-    });
   }
 
   function moveHole(delta){
